@@ -39,3 +39,8 @@ a {
 button {
   font-family: inherit;
 }
+@layer components {
+  .input-style {
+    @apply h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10;
+  }
+}

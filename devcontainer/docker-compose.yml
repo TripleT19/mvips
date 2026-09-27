@@ -1,0 +1,36 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+      - ..:/workspaces/mvips:cached
+
+    command: sleep infinity
+
+    ports:
+      - "8000:8000"
+      - "5173:5173"
+
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mvips
+      MYSQL_USER: mvips
+      MYSQL_PASSWORD: mvips
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - db-data:/var/lib/mysql
+
+volumes:
+  db-data:

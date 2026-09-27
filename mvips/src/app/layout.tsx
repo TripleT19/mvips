@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import BackToTop from "./components/BackToTop";
-
 export const metadata: Metadata = {
   title: {
-    default: "Mount View International Primary School & Early Years Centre",
+    default:
+      "Mount View International Primary School & Early Years Centre",
     template: "%s | Mount View International Primary School",
   },
   description:
@@ -21,15 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <Header />
-
-        {children}
-
-        <Footer />
-
-        <BackToTop />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
