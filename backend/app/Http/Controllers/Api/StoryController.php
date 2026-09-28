@@ -7,20 +7,30 @@ use App\Models\Story;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class StoryController extends Controller
 {
     /*
     |--------------------------------------------------------------------------
-    | ADMIN: LIST STORIES
+    | PUBLIC STORIES
     |--------------------------------------------------------------------------
     */
 
-    public function index(Request $request)
+    /**
+     * Display published stories for the public website.
+     *
+     * Supports:
+     * - Search
+     * - Category filtering
+     * - Class/year filtering
+     * - Featured filtering
+     * - Pagination
+     */
+    public function publicIndex(Request $request)
     {
-        $query = Story::with('category')
-            ->latest('created_at');
+        $query = Story::query()
+            ->with('category')
+            ->where('status', 'published');
 
         /*
         |--------------------------------------------------------------------------
@@ -36,42 +46,71 @@ class StoryController extends Controller
                     ->orWhere('excerpt', 'like', "%{$search}%")
                     ->orWhere('content', 'like', "%{$search}%")
                     ->orWhere('author', 'like', "%{$search}%")
-                    ->orWhere('class_name', 'like', "%{$search}%");
+                    ->orWhere('class_name', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                        $categoryQuery
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('slug', 'like', "%{$search}%");
+                    });
             });
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Status Filter
+        | Category filter
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $request->filled('status') &&
-            in_array(
-                $request->input('status'),
-                ['draft', 'published'],
-                true
-            )
-        ) {
+        if ($request->filled('category')) {
+            $category = $request->input('category');
+
+            $query->whereHas('category', function ($categoryQuery) use ($category) {
+                $categoryQuery
+                    ->where('slug', $category)
+                    ->orWhere('id', $category)
+                    ->orWhere('name', $category);
+            });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Class / Year filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('class_name')) {
             $query->where(
-                'status',
-                $request->input('status')
+                'class_name',
+                $request->input('class_name')
             );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Category Filter
+        | Featured filter
         |--------------------------------------------------------------------------
         */
 
-        if ($request->filled('category_id')) {
-            $query->where(
-                'category_id',
-                $request->input('category_id')
+        if ($request->has('featured')) {
+            $featured = filter_var(
+                $request->input('featured'),
+                FILTER_VALIDATE_BOOLEAN,
+                FILTER_NULL_ON_FAILURE
             );
+
+            if ($featured !== null) {
+                $query->where('featured', $featured);
+            }
         }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Ordering
+        |--------------------------------------------------------------------------
+        */
+
+        $query->orderByDesc('published_at')
+            ->orderByDesc('created_at');
 
         /*
         |--------------------------------------------------------------------------
@@ -79,133 +118,38 @@ class StoryController extends Controller
         |--------------------------------------------------------------------------
         */
 
-        $stories = $query->paginate(10);
+        $perPage = min(
+            max((int) $request->input('per_page', 12), 1),
+            100
+        );
 
-        return response()->json([
-            'success' => true,
-
-            'data' => $stories
-                ->getCollection()
-                ->map(fn ($story) =>
-                    $this->formatStory($story)
-                )
-                ->values(),
-
-            'pagination' => [
-                'current_page' => $stories->currentPage(),
-                'last_page' => $stories->lastPage(),
-                'per_page' => $stories->perPage(),
-                'total' => $stories->total(),
-            ],
-        ]);
-    }
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | PUBLIC: LIST PUBLISHED STORIES
-    |--------------------------------------------------------------------------
-    */
-
-    public function publicIndex(Request $request)
-    {
-        $query = Story::with('category')
-            ->where('status', 'published')
-            ->whereNotNull('published_date')
-            ->where(
-                'published_date',
-                '<=',
-                now()
-            )
-            ->latest('published_date');
+        $stories = $query->paginate($perPage);
 
         /*
         |--------------------------------------------------------------------------
-        | Optional Public Category Filter
+        | Format response
         |--------------------------------------------------------------------------
         */
 
-        if ($request->filled('category')) {
-            $query->whereHas(
-                'category',
-                function ($q) use ($request) {
-                    $q->where(
-                        'slug',
-                        $request->input('category')
-                    );
-                }
-            );
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Optional Public Search
-        |--------------------------------------------------------------------------
-        */
-
-        if ($request->filled('search')) {
-            $search = trim(
-                $request->input('search')
-            );
-
-            $query->where(function ($q) use ($search) {
-                $q->where(
-                    'title',
-                    'like',
-                    "%{$search}%"
-                )
-                    ->orWhere(
-                        'excerpt',
-                        'like',
-                        "%{$search}%"
-                    )
-                    ->orWhere(
-                        'content',
-                        'like',
-                        "%{$search}%"
-                    );
-            });
-        }
-
-        $stories = $query->paginate(12);
+        $stories->getCollection()->transform(
+            fn (Story $story) => $this->formatStory($story)
+        );
 
         return response()->json([
             'success' => true,
-
-            'data' => $stories
-                ->getCollection()
-                ->map(fn ($story) =>
-                    $this->formatStory($story)
-                )
-                ->values(),
-
-            'pagination' => [
-                'current_page' => $stories->currentPage(),
-                'last_page' => $stories->lastPage(),
-                'per_page' => $stories->perPage(),
-                'total' => $stories->total(),
-            ],
+            'data' => $stories,
         ]);
     }
 
-
-    /*
-    |--------------------------------------------------------------------------
-    | PUBLIC: SHOW STORY BY SLUG
-    |--------------------------------------------------------------------------
-    */
-
-    public function showPublic(string $slug)
+    /**
+     * Display a single published story publicly.
+     */
+    public function publicShow(string $slug)
     {
-        $story = Story::with('category')
+        $story = Story::query()
+            ->with('category')
             ->where('slug', $slug)
             ->where('status', 'published')
-            ->whereNotNull('published_date')
-            ->where(
-                'published_date',
-                '<=',
-                now()
-            )
             ->first();
 
         if (!$story) {
@@ -217,52 +161,136 @@ class StoryController extends Controller
 
         return response()->json([
             'success' => true,
-            'story' => $this->formatStory($story),
+            'data' => $this->formatStory($story),
         ]);
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | ADMIN: CREATE STORY
+    | ADMIN STORIES
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Display stories in the admin portal.
+     *
+     * Administrators can see both published stories and drafts.
+     */
+    public function index(Request $request)
+    {
+        $query = Story::query()
+            ->with('category');
+
+        /*
+        |--------------------------------------------------------------------------
+        | Search
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('search')) {
+            $search = trim($request->input('search'));
+
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('excerpt', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%")
+                    ->orWhere('author', 'like', "%{$search}%")
+                    ->orWhere('class_name', 'like', "%{$search}%")
+                    ->orWhereHas('category', function ($categoryQuery) use ($search) {
+                        $categoryQuery
+                            ->where('name', 'like', "%{$search}%")
+                            ->orWhere('slug', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Status filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('status')) {
+            $query->where(
+                'status',
+                $request->input('status')
+            );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Category filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('category')) {
+            $category = $request->input('category');
+
+            $query->whereHas('category', function ($categoryQuery) use ($category) {
+                $categoryQuery
+                    ->where('slug', $category)
+                    ->orWhere('id', $category)
+                    ->orWhere('name', $category);
+            });
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Featured filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->has('featured')) {
+            $featured = filter_var(
+                $request->input('featured'),
+                FILTER_VALIDATE_BOOLEAN,
+                FILTER_NULL_ON_FAILURE
+            );
+
+            if ($featured !== null) {
+                $query->where('featured', $featured);
+            }
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Class filter
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->filled('class_name')) {
+            $query->where(
+                'class_name',
+                $request->input('class_name')
+            );
+        }
+
+        $query->orderByDesc('created_at');
+
+        $perPage = min(
+            max((int) $request->input('per_page', 10), 1),
+            100
+        );
+
+        $stories = $query->paginate($perPage);
+
+        $stories->getCollection()->transform(
+            fn (Story $story) => $this->formatStory($story)
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => $stories,
+        ]);
+    }
+
+
+    /**
+     * Create a new story.
+     */
     public function store(Request $request)
     {
-        /*
-        |--------------------------------------------------------------------------
-        | Authenticated User
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | The author is NEVER accepted from the frontend.
-        | It is taken directly from the authenticated database user.
-        |
-        */
-
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        if (!$user->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account is inactive.',
-            ], 403);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validation
-        |--------------------------------------------------------------------------
-        */
-
         $validated = $request->validate([
             'title' => [
                 'required',
@@ -270,10 +298,10 @@ class StoryController extends Controller
                 'max:255',
             ],
 
-            'slug' => [
-                'nullable',
-                'string',
-                'max:255',
+            'category_id' => [
+                'required',
+                'integer',
+                'exists:categories,id',
             ],
 
             'class_name' => [
@@ -285,12 +313,6 @@ class StoryController extends Controller
             'event_date' => [
                 'nullable',
                 'date',
-            ],
-
-            'category_id' => [
-                'required',
-                'integer',
-                'exists:categories,id',
             ],
 
             'excerpt' => [
@@ -309,11 +331,13 @@ class StoryController extends Controller
             ],
 
             'status' => [
-                'required',
-                Rule::in([
-                    'draft',
-                    'published',
-                ]),
+                'nullable',
+                'in:draft,published',
+            ],
+
+            'published_at' => [
+                'nullable',
+                'date',
             ],
 
             'image' => [
@@ -326,162 +350,115 @@ class StoryController extends Controller
 
         /*
         |--------------------------------------------------------------------------
-        | Generate Unique Slug
+        | Generate slug
         |--------------------------------------------------------------------------
         */
 
         $slug = $this->generateUniqueSlug(
-            $validated['slug']
-                ?? $validated['title']
+            $validated['title']
         );
 
         /*
         |--------------------------------------------------------------------------
-        | Upload Image
+        | Determine status
         |--------------------------------------------------------------------------
         */
 
-        $imagePath = null;
+        $status = $validated['status'] ?? 'draft';
+
+        /*
+        |--------------------------------------------------------------------------
+        | Published date
+        |--------------------------------------------------------------------------
+        |
+        | If the story is being published and no date was supplied,
+        | automatically use the current date/time.
+        |
+        */
+
+        $publishedAt = null;
+
+        if ($status === 'published') {
+            $publishedAt =
+                $validated['published_at'] ??
+                now();
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Author
+        |--------------------------------------------------------------------------
+        |
+        | The author is automatically taken from the authenticated
+        | admin user's name.
+        |
+        */
+
+        $author = $request->user()?->name;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Create story
+        |--------------------------------------------------------------------------
+        */
+
+        $story = new Story();
+
+        $story->title = trim($validated['title']);
+        $story->slug = $slug;
+        $story->category_id = $validated['category_id'];
+        $story->class_name = $validated['class_name'] ?? null;
+        $story->event_date = $validated['event_date'] ?? null;
+        $story->excerpt = $validated['excerpt'] ?? null;
+        $story->content = $validated['content'];
+        $story->author = $author;
+        $story->featured = $validated['featured'] ?? false;
+        $story->status = $status;
+        $story->published_at = $publishedAt;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Image upload
+        |--------------------------------------------------------------------------
+        */
 
         if ($request->hasFile('image')) {
-            $imagePath = $request
+            $story->image_path = $request
                 ->file('image')
-                ->store(
-                    'stories',
-                    'public'
-                );
+                ->store('stories', 'public');
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Published Date
-        |--------------------------------------------------------------------------
-        */
-
-        $publishedDate = null;
-
-        if ($validated['status'] === 'published') {
-            $publishedDate = now();
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Create Story
-        |--------------------------------------------------------------------------
-        */
-
-        $story = Story::create([
-            'title' => $validated['title'],
-
-            'slug' => $slug,
-
-            /*
-            |--------------------------------------------------------------------------
-            | AUTHOR COMES FROM DATABASE
-            |--------------------------------------------------------------------------
-            */
-
-            'author' => $user->name,
-
-            'class_name' =>
-                $validated['class_name'] ?? null,
-
-            'event_date' =>
-                $validated['event_date'] ?? null,
-
-            'category_id' =>
-                $validated['category_id'],
-
-            'image_path' =>
-                $imagePath,
-
-            'excerpt' =>
-                $validated['excerpt'] ?? null,
-
-            'content' =>
-                $validated['content'],
-
-            'featured' =>
-                $request->boolean('featured'),
-
-            'status' =>
-                $validated['status'],
-
-            'published_date' =>
-                $publishedDate,
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Load Category
-        |--------------------------------------------------------------------------
-        */
+        $story->save();
 
         $story->load('category');
 
         return response()->json([
             'success' => true,
-
-            'message' =>
-                'Story created successfully.',
-
-            'story' =>
-                $this->formatStory($story),
+            'message' => 'Story created successfully.',
+            'data' => $this->formatStory($story),
         ], 201);
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN: SHOW STORY
-    |--------------------------------------------------------------------------
-    */
-
+    /**
+     * Display a single story in the admin portal.
+     */
     public function show(Story $story)
     {
         $story->load('category');
 
         return response()->json([
             'success' => true,
-
-            'story' =>
-                $this->formatStory($story),
+            'data' => $this->formatStory($story),
         ]);
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN: UPDATE STORY
-    |--------------------------------------------------------------------------
-    */
-
-    public function update(
-        Request $request,
-        Story $story
-    ) {
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthenticated.',
-            ], 401);
-        }
-
-        if (!$user->is_active) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account is inactive.',
-            ], 403);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Validation
-        |--------------------------------------------------------------------------
-        */
-
+    /**
+     * Update an existing story.
+     */
+    public function update(Request $request, Story $story)
+    {
         $validated = $request->validate([
             'title' => [
                 'required',
@@ -489,10 +466,10 @@ class StoryController extends Controller
                 'max:255',
             ],
 
-            'slug' => [
-                'nullable',
-                'string',
-                'max:255',
+            'category_id' => [
+                'required',
+                'integer',
+                'exists:categories,id',
             ],
 
             'class_name' => [
@@ -504,12 +481,6 @@ class StoryController extends Controller
             'event_date' => [
                 'nullable',
                 'date',
-            ],
-
-            'category_id' => [
-                'required',
-                'integer',
-                'exists:categories,id',
             ],
 
             'excerpt' => [
@@ -528,11 +499,13 @@ class StoryController extends Controller
             ],
 
             'status' => [
-                'required',
-                Rule::in([
-                    'draft',
-                    'published',
-                ]),
+                'nullable',
+                'in:draft,published',
+            ],
+
+            'published_at' => [
+                'nullable',
+                'date',
             ],
 
             'image' => [
@@ -541,353 +514,353 @@ class StoryController extends Controller
                 'mimes:jpeg,jpg,png,webp',
                 'max:5120',
             ],
+
+            'remove_image' => [
+                'nullable',
+                'boolean',
+            ],
         ]);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update basic information
+        |--------------------------------------------------------------------------
+        */
+
+        $story->title = trim($validated['title']);
+        $story->category_id = $validated['category_id'];
+        $story->class_name = $validated['class_name'] ?? null;
+        $story->event_date = $validated['event_date'] ?? null;
+        $story->excerpt = $validated['excerpt'] ?? null;
+        $story->content = $validated['content'];
+
+        $story->featured =
+            $validated['featured'] ?? false;
+
+        $newStatus =
+            $validated['status'] ??
+            $story->status;
 
         /*
         |--------------------------------------------------------------------------
         | Slug
         |--------------------------------------------------------------------------
-        */
-
-        $slugSource =
-            $validated['slug']
-            ?? $validated['title'];
-
-        $slug = $this->generateUniqueSlug(
-            $slugSource,
-            $story->id
-        );
-
-        /*
-        |--------------------------------------------------------------------------
-        | Existing Published Date
-        |--------------------------------------------------------------------------
-        */
-
-        $publishedDate =
-            $story->published_date;
-
-        /*
-        |--------------------------------------------------------------------------
-        | Draft -> Published
-        |--------------------------------------------------------------------------
+        |
+        | Regenerate the slug if the title changes.
+        |
         */
 
         if (
-            $validated['status'] === 'published' &&
-            !$story->published_date
+            trim($story->getOriginal('title')) !==
+            trim($validated['title'])
         ) {
-            $publishedDate = now();
+            $story->slug = $this->generateUniqueSlug(
+                $validated['title'],
+                $story->id
+            );
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Published -> Draft
+        | Publishing
+        |--------------------------------------------------------------------------
+        */
+
+        if ($newStatus === 'published') {
+            if (!empty($validated['published_at'])) {
+                $story->published_at =
+                    $validated['published_at'];
+            } elseif (!$story->published_at) {
+                $story->published_at = now();
+            }
+        } else {
+            /*
+            | Keep the previous publication date if the
+            | story is moved back to draft.
+            */
+        }
+
+        $story->status = $newStatus;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Image removal
         |--------------------------------------------------------------------------
         */
 
         if (
-            $validated['status'] === 'draft'
+            !empty($validated['remove_image']) &&
+            $story->image_path
         ) {
-            $publishedDate = null;
+            Storage::disk('public')->delete(
+                $story->image_path
+            );
+
+            $story->image_path = null;
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Image
+        | New image
         |--------------------------------------------------------------------------
         */
-
-        $imagePath =
-            $story->image_path;
 
         if ($request->hasFile('image')) {
-
             /*
-            |--------------------------------------------------------------------------
-            | Delete Previous Image
-            |--------------------------------------------------------------------------
+            | Delete the old image first.
             */
 
-            if (
-                $story->image_path &&
-                Storage::disk('public')
-                    ->exists(
-                        $story->image_path
-                    )
-            ) {
-                Storage::disk('public')
-                    ->delete(
-                        $story->image_path
-                    );
+            if ($story->image_path) {
+                Storage::disk('public')->delete(
+                    $story->image_path
+                );
             }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Store New Image
-            |--------------------------------------------------------------------------
-            */
-
-            $imagePath = $request
+            $story->image_path = $request
                 ->file('image')
-                ->store(
-                    'stories',
-                    'public'
-                );
+                ->store('stories', 'public');
         }
 
         /*
         |--------------------------------------------------------------------------
-        | Update Story
+        | Author
         |--------------------------------------------------------------------------
         |
-        | IMPORTANT:
-        | The original author is intentionally NOT changed.
+        | Do NOT replace the original author when an editor
+        | updates the story.
+        |
+        | The person who created/published the story remains
+        | the recorded author.
         |
         */
 
-        $story->update([
-            'title' =>
-                $validated['title'],
+        if (!$story->author) {
+            $story->author =
+                $request->user()?->name;
+        }
 
-            'slug' =>
-                $slug,
-
-            /*
-            |--------------------------------------------------------------------------
-            | DO NOT CHANGE AUTHOR
-            |--------------------------------------------------------------------------
-            |
-            | The original creator remains the author even when another
-            | administrator edits the story.
-            |
-            */
-
-            'class_name' =>
-                $validated['class_name'] ?? null,
-
-            'event_date' =>
-                $validated['event_date'] ?? null,
-
-            'category_id' =>
-                $validated['category_id'],
-
-            'image_path' =>
-                $imagePath,
-
-            'excerpt' =>
-                $validated['excerpt'] ?? null,
-
-            'content' =>
-                $validated['content'],
-
-            'featured' =>
-                $request->boolean('featured'),
-
-            'status' =>
-                $validated['status'],
-
-            'published_date' =>
-                $publishedDate,
-        ]);
+        $story->save();
 
         $story->load('category');
 
         return response()->json([
             'success' => true,
-
-            'message' =>
-                'Story updated successfully.',
-
-            'story' =>
-                $this->formatStory($story),
+            'message' => 'Story updated successfully.',
+            'data' => $this->formatStory($story),
         ]);
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN: DELETE STORY
-    |--------------------------------------------------------------------------
-    */
-
+    /**
+     * Delete a story.
+     */
     public function destroy(Story $story)
     {
         /*
         |--------------------------------------------------------------------------
-        | Delete Story Image
+        | Delete associated image
         |--------------------------------------------------------------------------
         */
 
-        if (
-            $story->image_path &&
-            Storage::disk('public')
-                ->exists(
-                    $story->image_path
-                )
-        ) {
-            Storage::disk('public')
-                ->delete(
-                    $story->image_path
-                );
+        if ($story->image_path) {
+            Storage::disk('public')->delete(
+                $story->image_path
+            );
         }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Delete Story
-        |--------------------------------------------------------------------------
-        */
 
         $story->delete();
 
         return response()->json([
             'success' => true,
-
-            'message' =>
-                'Story deleted successfully.',
+            'message' => 'Story deleted successfully.',
         ]);
     }
 
 
     /*
     |--------------------------------------------------------------------------
-    | GENERATE UNIQUE SLUG
+    | FEATURED STORIES
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * Return published featured stories.
+     */
+    public function featured(Request $request)
+    {
+        $limit = min(
+            max((int) $request->input('limit', 6), 1),
+            20
+        );
+
+        $stories = Story::query()
+            ->with('category')
+            ->where('status', 'published')
+            ->where('featured', true)
+            ->orderByDesc('published_at')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $stories->map(
+                fn (Story $story) =>
+                    $this->formatStory($story)
+            )->values(),
+        ]);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Generate a unique story slug.
+     */
     private function generateUniqueSlug(
-        string $value,
+        string $title,
         ?int $ignoreId = null
     ): string {
-        $slug = Str::slug($value);
+        $baseSlug = Str::slug($title);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Fallback
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$slug) {
-            $slug = 'story';
+        if ($baseSlug === '') {
+            $baseSlug = 'story';
         }
 
-        $originalSlug = $slug;
+        $slug = $baseSlug;
+        $counter = 2;
 
-        $counter = 1;
-
-        while (true) {
-
-            $query = Story::where(
-                'slug',
-                $slug
-            );
-
-            if ($ignoreId) {
-                $query->where(
-                    'id',
-                    '!=',
-                    $ignoreId
-                );
-            }
-
-            if (!$query->exists()) {
-                break;
-            }
-
+        while (
+            Story::where('slug', $slug)
+                ->when(
+                    $ignoreId,
+                    fn ($query) =>
+                        $query->where('id', '!=', $ignoreId)
+                )
+                ->exists()
+        ) {
+            $slug = $baseSlug . '-' . $counter;
             $counter++;
-
-            $slug =
-                $originalSlug .
-                '-' .
-                $counter;
         }
 
         return $slug;
     }
 
 
-    /*
-    |--------------------------------------------------------------------------
-    | FORMAT STORY
-    |--------------------------------------------------------------------------
-    */
-
-    private function formatStory(
-        Story $story
-    ): array {
+    /**
+     * Format a story for API responses.
+     *
+     * This is especially important for the public News page.
+     *
+     * The author is explicitly included here.
+     */
+    private function formatStory(Story $story): array
+    {
         return [
-            'id' =>
-                $story->id,
+            'id' => $story->id,
 
-            'title' =>
-                $story->title,
+            'title' => $story->title,
 
-            'slug' =>
-                $story->slug,
+            'slug' => $story->slug,
 
             /*
             |--------------------------------------------------------------------------
-            | Original Creator
+            | Category
             |--------------------------------------------------------------------------
             */
 
-            'author' =>
-                $story->author,
+            'category_id' => $story->category_id,
 
-            'class_name' =>
-                $story->class_name,
+            'category' => $story->category
+                ? [
+                    'id' => $story->category->id,
+                    'name' => $story->category->name,
+                    'slug' => $story->category->slug,
+                    'description' =>
+                        $story->category->description,
+                ]
+                : null,
 
-            'event_date' =>
-                $story->event_date,
+            /*
+            |--------------------------------------------------------------------------
+            | Story information
+            |--------------------------------------------------------------------------
+            */
 
-            'published_date' =>
-                $story->published_date,
+            'class_name' => $story->class_name,
 
-            'category_id' =>
-                $story->category_id,
+            'event_date' => $story->event_date,
 
-            'category' =>
-                $story->category
-                    ? [
-                        'id' =>
-                            $story->category->id,
+            'excerpt' => $story->excerpt,
 
-                        'name' =>
-                            $story->category->name,
+            'content' => $story->content,
 
-                        'slug' =>
-                            $story->category->slug,
-                    ]
-                    : null,
+            /*
+            |--------------------------------------------------------------------------
+            | AUTHOR
+            |--------------------------------------------------------------------------
+            |
+            | This field is intentionally included in the
+            | public API response.
+            |
+            */
 
-            'image_path' =>
-                $story->image_path,
+            'author' => $story->author,
 
-            'image_url' =>
+            /*
+            |--------------------------------------------------------------------------
+            | Image
+            |--------------------------------------------------------------------------
+            */
+
+            'image_path' => $story->image_path,
+
+            'image_url' => $this->getImageUrl(
                 $story->image_path
-                    ? Storage::disk('public')
-                        ->url(
-                            $story->image_path
-                        )
-                    : null,
+            ),
 
-            'excerpt' =>
-                $story->excerpt,
+            /*
+            |--------------------------------------------------------------------------
+            | Publishing
+            |--------------------------------------------------------------------------
+            */
 
-            'content' =>
-                $story->content,
+            'featured' => (bool) $story->featured,
 
-            'featured' =>
-                (bool) $story->featured,
+            'status' => $story->status,
 
-            'status' =>
-                $story->status,
+            'published_at' => $story->published_at,
 
-            'created_at' =>
-                $story->created_at,
+            /*
+            |--------------------------------------------------------------------------
+            | Timestamps
+            |--------------------------------------------------------------------------
+            */
 
-            'updated_at' =>
-                $story->updated_at,
+            'created_at' => $story->created_at,
+
+            'updated_at' => $story->updated_at,
         ];
     }
+
+
+    /**
+     * Generate the public image URL.
+     */
+    private function getImageUrl(
+        ?string $imagePath
+    ): ?string {
+        if (!$imagePath) {
+            return null;
+        }
+
+        return Storage::disk('public')->url(
+            $imagePath
+        );
+    }
 }
+

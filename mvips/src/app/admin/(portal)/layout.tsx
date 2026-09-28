@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Metadata } from "next";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminHeader from "../components/AdminHeader";
 
@@ -54,12 +53,11 @@ export default function AdminLayout({
   return (
     <div className="min-h-screen bg-[#F6F7FB]">
       <AdminSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onLogout={handleLogout}
+        mobileOpen={sidebarOpen}
+        setMobileOpen={setSidebarOpen}
       />
 
-      <div className="lg:pl-72">
+      <div className="lg:ml-[260px]">
         <AdminHeader
           onMenuClick={() => setSidebarOpen(true)}
           userName={userName}
@@ -75,3 +73,4 @@ export default function AdminLayout({
     </div>
   );
 }
+

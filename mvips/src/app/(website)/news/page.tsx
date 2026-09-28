@@ -56,6 +56,9 @@ type Story = {
 
   featured?: boolean | number | null;
 
+  /* AUTHOR */
+  author?: string | null;
+
   published_at?: string | null;
   event_date?: string | null;
   created_at?: string | null;
@@ -287,9 +290,6 @@ export default function NewsPage() {
   const [selectedStory, setSelectedStory] =
     useState<Story | null>(null);
 
-  /*
-   * Close article modal with Escape.
-   */
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -307,9 +307,6 @@ export default function NewsPage() {
     };
   }, []);
 
-  /*
-   * Prevent the page behind the modal from scrolling.
-   */
   useEffect(() => {
     if (selectedStory) {
       document.body.style.overflow = "hidden";
@@ -322,9 +319,6 @@ export default function NewsPage() {
     };
   }, [selectedStory]);
 
-  /*
-   * Load news and events.
-   */
   useEffect(() => {
     let mounted = true;
 
@@ -412,9 +406,6 @@ export default function NewsPage() {
     };
   }, []);
 
-  /*
-   * Build category list.
-   */
   const categories = useMemo(() => {
     const categoryNames = stories
       .map((story) =>
@@ -428,9 +419,6 @@ export default function NewsPage() {
     ];
   }, [stories]);
 
-  /*
-   * Filter news.
-   */
   const filteredStories = useMemo(() => {
     if (selectedCategory === "All") {
       return stories;
@@ -443,9 +431,6 @@ export default function NewsPage() {
     );
   }, [stories, selectedCategory]);
 
-  /*
-   * Find featured story.
-   */
   const featuredStory = useMemo(() => {
     return (
       filteredStories.find(
@@ -456,9 +441,6 @@ export default function NewsPage() {
     );
   }, [filteredStories]);
 
-  /*
-   * Latest stories excluding featured story.
-   */
   const latestStories = useMemo(() => {
     if (!featuredStory) {
       return filteredStories;
@@ -469,10 +451,6 @@ export default function NewsPage() {
     );
   }, [filteredStories, featuredStory]);
 
-  /*
-   * Events are already filtered by the Laravel public
-   * endpoint so expired events should not appear here.
-   */
   const upcomingEvents = useMemo(() => {
     return [...events]
       .sort((a, b) => {
@@ -490,6 +468,7 @@ export default function NewsPage() {
   return (
     <>
       <main className="min-h-screen bg-white text-[#172033]">
+
         {/* =====================================================
             HERO
         ====================================================== */}
@@ -652,6 +631,7 @@ export default function NewsPage() {
           {!loadingStories &&
             featuredStory && (
               <div className="grid gap-8 lg:grid-cols-2">
+
                 {/* Featured story */}
                 <button
                   type="button"
@@ -688,7 +668,7 @@ export default function NewsPage() {
                       </div>
                     )}
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
 
                     <div className="absolute left-5 top-5">
                       <span className="rounded-full bg-[#FFE900] px-4 py-2 text-xs font-black uppercase tracking-wide text-[#252B68]">
@@ -711,11 +691,24 @@ export default function NewsPage() {
                         {featuredStory.title}
                       </h3>
 
-                      <div className="mt-3 flex items-center gap-2 text-sm text-white/80">
-                        <CalendarDays size={15} />
+                      {/* DATE + AUTHOR */}
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays size={15} />
 
-                        {formatDate(
-                          getStoryDate(featuredStory)
+                          {formatDate(
+                            getStoryDate(featuredStory)
+                          )}
+                        </div>
+
+                        {featuredStory.author && (
+                          <div className="flex items-center gap-2">
+                            <Users size={15} />
+
+                            <span>
+                              By {featuredStory.author}
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -807,11 +800,23 @@ export default function NewsPage() {
                                   {story.title}
                                 </h4>
 
-                                <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                                  <CalendarDays size={14} />
+                                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                                  <div className="flex items-center gap-1.5">
+                                    <CalendarDays size={14} />
 
-                                  {formatShortDate(
-                                    getStoryDate(story)
+                                    {formatShortDate(
+                                      getStoryDate(story)
+                                    )}
+                                  </div>
+
+                                  {story.author && (
+                                    <div className="flex items-center gap-1.5">
+                                      <Users size={14} />
+
+                                      <span>
+                                        {story.author}
+                                      </span>
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1085,7 +1090,6 @@ export default function NewsPage() {
               event.stopPropagation()
             }
           >
-            {/* Close button */}
             <button
               type="button"
               onClick={() =>
@@ -1118,7 +1122,7 @@ export default function NewsPage() {
                   className="object-cover"
                 />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
                 <div className="absolute bottom-5 left-6 right-16 sm:left-8">
                   {getCategoryName(
@@ -1144,7 +1148,7 @@ export default function NewsPage() {
             {/* Article content */}
             <div className="overflow-y-auto">
               <article className="mx-auto max-w-4xl px-6 py-7 sm:px-10 sm:py-9">
-                {/* If there is no image, show title here */}
+
                 {!getImageUrl(
                   selectedStory.image_url ||
                     selectedStory.image ||
@@ -1172,6 +1176,7 @@ export default function NewsPage() {
 
                 {/* Meta */}
                 <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 border-b border-gray-200 pb-5 text-sm text-gray-500">
+
                   {getStoryDate(selectedStory) && (
                     <div className="flex items-center gap-2">
                       <CalendarDays
@@ -1182,6 +1187,23 @@ export default function NewsPage() {
                       {formatDate(
                         getStoryDate(selectedStory)
                       )}
+                    </div>
+                  )}
+
+                  {/* AUTHOR */}
+                  {selectedStory.author && (
+                    <div className="flex items-center gap-2">
+                      <Users
+                        size={16}
+                        className="text-[#F58220]"
+                      />
+
+                      <span>
+                        By{" "}
+                        <strong className="font-semibold text-[#252B68]">
+                          {selectedStory.author}
+                        </strong>
+                      </span>
                     </div>
                   )}
 
