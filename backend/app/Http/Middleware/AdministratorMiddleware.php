@@ -8,6 +8,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AdministratorMiddleware
 {
+    /**
+     * Only true administrators may manage users.
+     */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
@@ -22,14 +25,14 @@ class AdministratorMiddleware
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is inactive.',
+                'message' => 'Your account has not been activated yet.',
             ], 403);
         }
 
         if (!in_array($user->role, ['administrator', 'admin'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Only administrators can manage users.',
+                'message' => 'Only administrators can access this resource.',
             ], 403);
         }
 

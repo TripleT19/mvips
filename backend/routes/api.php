@@ -1,9 +1,8 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Api\AdminAuthController;
 use App\Http\Controllers\Api\AdminProfileController;
 use App\Http\Controllers\Api\AdminUserController;
 use App\Http\Controllers\Api\EventController;
@@ -12,509 +11,252 @@ use App\Http\Controllers\Api\GalleryController;
 use App\Http\Controllers\Api\GalleryImageController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\PublicAdmissionController;
+use App\Http\Controllers\Api\AdminAdmissionController;
+use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\NewsletterSubscriberController;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Mount View International Primary School & Early Years Centre
-|
-| Public website:
-|   /api/stories
-|   /api/events
-|   /api/gallery
-|
-| Administration:
-|   /api/admin/*
-|
+| ADMIN AUTHENTICATION
 |--------------------------------------------------------------------------
 */
 
+Route::post('/admin/login', [AdminAuthController::class, 'login']);
+Route::post('/admin/activate-account', [AdminAuthController::class, 'activateAccount']);
 
 /*
 |--------------------------------------------------------------------------
-| ADMIN LOGIN
-|--------------------------------------------------------------------------
-|
-| POST /api/admin/login
-|
-| Allowed CMS roles:
-| - administrator
-| - editor
-| - staff
-|
-|--------------------------------------------------------------------------
-*/
-
-Route::post('/admin/login', function (Request $request) {
-
-    $validated = $request->validate([
-        'email' => [
-            'required',
-            'email',
-        ],
-
-        'password' => [
-            'required',
-            'string',
-        ],
-
-        'remember' => [
-            'nullable',
-            'boolean',
-        ],
-    ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Find user
-    |--------------------------------------------------------------------------
-    */
-
-    $user = \App\Models\User::where(
-        'email',
-        strtolower(trim($validated['email']))
-    )->first();
-
-    /*
-    |--------------------------------------------------------------------------
-    | Invalid credentials
-    |--------------------------------------------------------------------------
-    */
-
-    if (
-        !$user ||
-        !Hash::check(
-            $validated['password'],
-            $user->password
-        )
-    ) {
-        return response()->json([
-            'success' => false,
-            'message' => 'The email or password is incorrect.',
-        ], 401);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Inactive account
-    |--------------------------------------------------------------------------
-    */
-
-    if (!$user->is_active) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Your account is inactive. Please contact the administrator.',
-        ], 403);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | CMS ACCESS
-    |--------------------------------------------------------------------------
-    */
-
-    $allowedRoles = [
-        'administrator',
-        'editor',
-        'staff',
-    ];
-
-    if (!in_array($user->role, $allowedRoles, true)) {
-        return response()->json([
-            'success' => false,
-            'message' => 'You do not have access to the administration portal.',
-        ], 403);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Remove previous tokens
-    |--------------------------------------------------------------------------
-    */
-
-    $user->tokens()->delete();
-
-    $token = $user->createToken(
-        'mount-view-admin'
-    )->plainTextToken;
-
-    /*
-    |--------------------------------------------------------------------------
-    | Successful login
-    |--------------------------------------------------------------------------
-    */
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Login successful.',
-        'token' => $token,
-
-        'user' => [
-            'id' => $user->id,
-            'name' => $user->name,
-            'email' => $user->email,
-            'role' => $user->role,
-            'is_active' => (bool) $user->is_active,
-        ],
-    ]);
-});
-
-
-/*
-|--------------------------------------------------------------------------
-| AUTHENTICATED USER ROUTES
+| AUTHENTICATED ADMIN USER
 |--------------------------------------------------------------------------
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
-    /*
-    |--------------------------------------------------------------------------
-    | CURRENT USER
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/admin/user', function (Request $request) {
-
-        $user = $request->user();
-
-        return response()->json([
-            'success' => true,
-
-            'user' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'is_active' => (bool) $user->is_active,
-                'created_at' => $user->created_at,
-            ],
-        ]);
-    });
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | LOGOUT
-    |--------------------------------------------------------------------------
-    */
-
-    Route::post('/admin/logout', function (Request $request) {
-
-        $token = $request->user()->currentAccessToken();
-
-        if ($token) {
-            $token->delete();
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Logged out successfully.',
-        ]);
-    });
+    Route::get('/admin/user', [AdminAuthController::class, 'user']);
+    Route::post('/admin/logout', [AdminAuthController::class, 'logout']);
 });
 
+/*
+|--------------------------------------------------------------------------
+| PUBLIC WEBSITE
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/stories', [StoryController::class, 'publicIndex']);
+Route::get('/stories/{slug}', [StoryController::class, 'showPublic']);
+
+Route::get('/events', [EventController::class, 'publicIndex']);
+Route::get('/events/{slug}', [EventController::class, 'showPublic']);
+
+Route::get('/gallery', [GalleryController::class, 'publicIndex']);
+Route::get('/gallery/{slug}', [GalleryController::class, 'showPublic']);
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC STORIES
+| PUBLIC NEWSLETTERS
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/newsletters', [NewsletterController::class, 'publicIndex']);
+Route::get('/newsletters/{slug}', [NewsletterController::class, 'publicShow']);
+Route::get('/newsletters/{slug}/download', [NewsletterController::class, 'download']);
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC NEWSLETTER SUBSCRIBERS
+|--------------------------------------------------------------------------
+| Anybody can subscribe, and the unsubscribe link in emails is public.
+*/
+
+Route::post('/newsletter-subscribers', [NewsletterSubscriberController::class, 'store']);
+Route::get('/newsletter-subscribers/unsubscribe/{token}', [NewsletterSubscriberController::class, 'unsubscribe']);
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC ADMISSIONS
+|--------------------------------------------------------------------------
+*/
+
+Route::post('/admissions/applications', [PublicAdmissionController::class, 'start']);
+Route::post('/admissions/applications/resend-credentials', [PublicAdmissionController::class, 'resendCredentials']);
+Route::post('/admissions/applications/{applicationNumber}/track', [PublicAdmissionController::class, 'show']);
+Route::post('/admissions/applications/{applicationNumber}/save', [PublicAdmissionController::class, 'save']);
+Route::post('/admissions/applications/{applicationNumber}/photo', [PublicAdmissionController::class, 'uploadPhoto']);
+Route::get('/admissions/applications/{applicationNumber}/photo', [PublicAdmissionController::class, 'showPhoto']);
+Route::post('/admissions/applications/{applicationNumber}/documents', [PublicAdmissionController::class, 'uploadDocument']);
+Route::post('/admissions/applications/{applicationNumber}/submit', [PublicAdmissionController::class, 'submit']);
+
+/*
+|--------------------------------------------------------------------------
+| GENERAL ADMIN PORTAL
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware(['auth:sanctum', 'admin'])->group(function () {
+
+    Route::get('/admin/categories', [CategoryController::class, 'index']);
+    Route::post('/admin/categories', [CategoryController::class, 'store']);
+
+    Route::get('/admin/stories', [StoryController::class, 'index']);
+    Route::post('/admin/stories', [StoryController::class, 'store']);
+    Route::get('/admin/stories/{story}', [StoryController::class, 'show']);
+    Route::match(['post', 'put', 'patch'], '/admin/stories/{story}', [StoryController::class, 'update']);
+    Route::delete('/admin/stories/{story}', [StoryController::class, 'destroy']);
+
+    Route::get('/admin/events', [EventController::class, 'index']);
+    Route::post('/admin/events', [EventController::class, 'store']);
+    Route::get('/admin/events/{event}', [EventController::class, 'show']);
+    Route::match(['post', 'put', 'patch'], '/admin/events/{event}', [EventController::class, 'update']);
+    Route::delete('/admin/events/{event}', [EventController::class, 'destroy']);
+
+    Route::get('/admin/gallery', [GalleryController::class, 'index']);
+    Route::post('/admin/gallery', [GalleryController::class, 'store']);
+    Route::get('/admin/gallery/{gallery}', [GalleryController::class, 'show']);
+    Route::match(['post', 'put', 'patch'], '/admin/gallery/{gallery}', [GalleryController::class, 'update']);
+    Route::delete('/admin/gallery/{gallery}', [GalleryController::class, 'destroy']);
+
+    Route::delete('/admin/gallery-images/{galleryImage}', [GalleryImageController::class, 'destroy']);
+    Route::post('/admin/gallery-images/reorder', [GalleryImageController::class, 'reorder']);
+
+    Route::get('/admin/profile', [AdminProfileController::class, 'show']);
+    Route::put('/admin/profile', [AdminProfileController::class, 'update']);
+    Route::post('/admin/profile/password', [AdminProfileController::class, 'changePassword']);
+
+    Route::get('/admin/dashboard', [DashboardController::class, 'index']);
+
+    /*
+    |----------------------------------------------------------------------
+    | ADMIN — NEWSLETTERS
+    |----------------------------------------------------------------------
+    */
+
+    Route::get('/admin/newsletters', [NewsletterController::class, 'index']);
+    Route::post('/admin/newsletters', [NewsletterController::class, 'store']);
+    Route::get('/admin/newsletters/{newsletter}', [NewsletterController::class, 'show']);
+    Route::match(['put', 'patch'], '/admin/newsletters/{newsletter}', [NewsletterController::class, 'update']);
+    Route::delete('/admin/newsletters/{newsletter}', [NewsletterController::class, 'destroy']);
+
+    /*
+    |----------------------------------------------------------------------
+    | ADMIN — NEWSLETTER SUBSCRIBERS
+    |----------------------------------------------------------------------
+    */
+
+    Route::get('/admin/newsletter-subscribers', [NewsletterSubscriberController::class, 'index']);
+    Route::delete('/admin/newsletter-subscribers/{subscriber}', [NewsletterSubscriberController::class, 'destroy']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| PRINTABLE APPLICATION (PUBLIC WITH QUERY-TOKEN)
 |--------------------------------------------------------------------------
 */
 
 Route::get(
-    '/stories',
-    [StoryController::class, 'publicIndex']
+    'admin/admissions/applications/{application}/print',
+    [AdminAdmissionController::class, 'printApplication']
 );
-
-Route::get(
-    '/stories/{slug}',
-    [StoryController::class, 'showPublic']
-);
-
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC EVENTS
-|--------------------------------------------------------------------------
-*/
-
-Route::get(
-    '/events',
-    [EventController::class, 'publicIndex']
-);
-
-Route::get(
-    '/events/{slug}',
-    [EventController::class, 'showPublic']
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| PUBLIC GALLERY
-|--------------------------------------------------------------------------
-*/
-
-Route::get(
-    '/gallery',
-    [GalleryController::class, 'publicIndex']
-);
-
-Route::get(
-    '/gallery/{slug}',
-    [GalleryController::class, 'showPublic']
-);
-
-
-/*
-|--------------------------------------------------------------------------
-| ADMIN PORTAL
-|--------------------------------------------------------------------------
-|
-| Available to:
-|
-| - administrator
-| - editor
-| - staff
-|
+| ADMISSIONS ADMIN MODULE
 |--------------------------------------------------------------------------
 */
 
 Route::middleware([
     'auth:sanctum',
-    'admin',
-])->group(function () {
+    'admission.role:admissions_officer,principal,headteacher',
+])->prefix('admin/admissions')->group(function () {
 
+    Route::get('/dashboard', [AdminAdmissionController::class, 'dashboard']);
+    Route::get('/form-options', [AdminAdmissionController::class, 'formOptions']);
 
-    /*
-    |--------------------------------------------------------------------------
-    | STORY CATEGORIES
-    |--------------------------------------------------------------------------
-    */
+    Route::get('/notifications', [AdminAdmissionController::class, 'notifications']);
+    Route::post('/notifications/read-all', [AdminAdmissionController::class, 'markAllNotificationsRead']);
+    Route::post('/notifications/{id}/read', [AdminAdmissionController::class, 'markNotificationRead']);
+
+    Route::get('/', [AdminAdmissionController::class, 'index']);
+    Route::get('/applications', [AdminAdmissionController::class, 'index']);
+    Route::post('/applications', [AdminAdmissionController::class, 'store']);
+
+    Route::get('/applications/{application}', [AdminAdmissionController::class, 'show']);
+    Route::match(
+        ['put', 'patch'],
+        '/applications/{application}',
+        [AdminAdmissionController::class, 'update']
+    );
 
     Route::get(
-        '/admin/categories',
-        [CategoryController::class, 'index']
+        '/applications/{application}/documents/{document}/preview',
+        [AdminAdmissionController::class, 'previewDocument']
+    );
+    Route::get(
+        '/applications/{application}/documents/{document}/download',
+        [AdminAdmissionController::class, 'downloadDocument']
+    );
+    Route::post(
+        '/applications/{application}/documents/{document}/verify',
+        [AdminAdmissionController::class, 'verifyDocument']
     );
 
     Route::post(
-        '/admin/categories',
-        [CategoryController::class, 'store']
+        '/applications/{application}/assessments',
+        [AdminAdmissionController::class, 'scheduleAssessment']
     );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN STORIES
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/admin/stories',
-        [StoryController::class, 'index']
+    Route::post(
+        '/assessments/{assessment}/complete',
+        [AdminAdmissionController::class, 'completeAssessment']
     );
 
     Route::post(
-        '/admin/stories',
-        [StoryController::class, 'store']
+        '/applications/{application}/enrol',
+        [AdminAdmissionController::class, 'enrol']
     );
 
-    Route::get(
-        '/admin/stories/{story}',
-        [StoryController::class, 'show']
+    Route::post(
+        '/applications/{application}/comments',
+        [AdminAdmissionController::class, 'storeComment']
     );
-
-    /*
-    |--------------------------------------------------------------------------
-    | STORY UPDATE
-    |--------------------------------------------------------------------------
-    |
-    | POST is included because story updates may contain image uploads.
-    |
-    | The frontend can use:
-    |
-    | POST + _method=PUT
-    |
-    | or:
-    |
-    | PUT
-    |
-    | or:
-    |
-    | PATCH
-    |
-    */
+    Route::match(
+        ['put', 'patch'],
+        '/applications/{application}/comments/{comment}',
+        [AdminAdmissionController::class, 'updateComment']
+    );
+    Route::delete(
+        '/applications/{application}/comments/{comment}',
+        [AdminAdmissionController::class, 'destroyComment']
+    );
 
     Route::match(
-        ['post', 'put', 'patch'],
-        '/admin/stories/{story}',
-        [StoryController::class, 'update']
+        ['put', 'patch'],
+        '/applications/{application}/decisions/{decision}',
+        [AdminAdmissionController::class, 'updateDecision']
     );
-
     Route::delete(
-        '/admin/stories/{story}',
-        [StoryController::class, 'destroy']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN EVENTS
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/admin/events',
-        [EventController::class, 'index']
-    );
-
-    Route::post(
-        '/admin/events',
-        [EventController::class, 'store']
-    );
-
-    Route::get(
-        '/admin/events/{event}',
-        [EventController::class, 'show']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | EVENT UPDATE
-    |--------------------------------------------------------------------------
-    |
-    | POST is supported for multipart image uploads.
-    |
-    */
-
-    Route::match(
-        ['post', 'put', 'patch'],
-        '/admin/events/{event}',
-        [EventController::class, 'update']
-    );
-
-    Route::delete(
-        '/admin/events/{event}',
-        [EventController::class, 'destroy']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN GALLERY
-    |--------------------------------------------------------------------------
-    |
-    | Gallery albums support multiple images.
-    |
-    */
-
-    Route::get(
-        '/admin/gallery',
-        [GalleryController::class, 'index']
-    );
-
-    Route::post(
-        '/admin/gallery',
-        [GalleryController::class, 'store']
-    );
-
-    Route::get(
-        '/admin/gallery/{gallery}',
-        [GalleryController::class, 'show']
-    );
-
-    /*
-    |--------------------------------------------------------------------------
-    | GALLERY UPDATE
-    |--------------------------------------------------------------------------
-    |
-    | POST is supported because gallery updates may contain
-    | multiple image uploads.
-    |
-    */
-
-    Route::match(
-        ['post', 'put', 'patch'],
-        '/admin/gallery/{gallery}',
-        [GalleryController::class, 'update']
-    );
-
-    Route::delete(
-        '/admin/gallery/{gallery}',
-        [GalleryController::class, 'destroy']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | GALLERY IMAGES
-    |--------------------------------------------------------------------------
-    */
-
-    Route::delete(
-        '/admin/gallery-images/{galleryImage}',
-        [GalleryImageController::class, 'destroy']
-    );
-
-    Route::post(
-        '/admin/gallery-images/reorder',
-        [GalleryImageController::class, 'reorder']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN PROFILE
-    |--------------------------------------------------------------------------
-    |
-    | All CMS users can manage their own profile.
-    |
-    | Email is changed only by an administrator.
-    |
-    */
-
-    Route::get(
-        '/admin/profile',
-        [AdminProfileController::class, 'show']
-    );
-
-    Route::put(
-        '/admin/profile',
-        [AdminProfileController::class, 'update']
-    );
-
-    Route::post(
-        '/admin/profile/password',
-        [AdminProfileController::class, 'changePassword']
-    );
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | ADMIN DASHBOARD
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/admin/dashboard',
-        [DashboardController::class, 'index']
+        '/applications/{application}/decisions/{decision}',
+        [AdminAdmissionController::class, 'destroyDecision']
     );
 });
 
+/*
+|--------------------------------------------------------------------------
+| PRINCIPAL-ONLY ADMISSION DECISIONS
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware([
+    'auth:sanctum',
+    'admission.role:principal',
+])->prefix('admin/admissions')->group(function () {
+    Route::post(
+        '/applications/{application}/decision',
+        [AdminAdmissionController::class, 'decide']
+    );
+});
 
 /*
 |--------------------------------------------------------------------------
-| ADMINISTRATOR-ONLY ROUTES
-|--------------------------------------------------------------------------
-|
-| Only users with:
-|
-| role = administrator
-|
-| can manage user accounts.
-|
+| ADMINISTRATOR-ONLY USER MANAGEMENT
 |--------------------------------------------------------------------------
 */
 
@@ -522,51 +264,12 @@ Route::middleware([
     'auth:sanctum',
     'administrator',
 ])->group(function () {
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | USER MANAGEMENT
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get(
-        '/admin/users',
-        [AdminUserController::class, 'index']
-    );
-
-    Route::post(
-        '/admin/users',
-        [AdminUserController::class, 'store']
-    );
-
-    Route::post(
-        '/admin/users/bulk',
-        [AdminUserController::class, 'bulkStore']
-    );
-
-    Route::get(
-        '/admin/users/{user}',
-        [AdminUserController::class, 'show']
-    );
-
-    Route::put(
-        '/admin/users/{user}',
-        [AdminUserController::class, 'update']
-    );
-
-    Route::post(
-        '/admin/users/{user}/reset-password',
-        [AdminUserController::class, 'resetPassword']
-    );
-
-    Route::post(
-        '/admin/users/{user}/resend-activation',
-        [AdminUserController::class, 'resendActivation']
-    );
-
-    Route::delete(
-        '/admin/users/{user}',
-        [AdminUserController::class, 'destroy']
-    );
+    Route::get('/admin/users', [AdminUserController::class, 'index']);
+    Route::post('/admin/users', [AdminUserController::class, 'store']);
+    Route::post('/admin/users/bulk', [AdminUserController::class, 'bulkStore']);
+    Route::get('/admin/users/{user}', [AdminUserController::class, 'show']);
+    Route::put('/admin/users/{user}', [AdminUserController::class, 'update']);
+    Route::post('/admin/users/{user}/reset-password', [AdminUserController::class, 'resetPassword']);
+    Route::post('/admin/users/{user}/resend-activation', [AdminUserController::class, 'resendActivation']);
+    Route::delete('/admin/users/{user}', [AdminUserController::class, 'destroy']);
 });

@@ -81,6 +81,8 @@ class AdminAuthController extends Controller
                     'admin',
                     'editor',
                     'staff',
+                    'admissions_officer',
+                    'principal',
                 ],
                 true
             )

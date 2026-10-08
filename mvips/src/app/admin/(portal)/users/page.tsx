@@ -37,14 +37,37 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 | Example:
 | john.banda
 | becomes:
-| john.banda@mounviewmw.com
+| john.banda@mountviewmw.com
 |
 */
-const SCHOOL_EMAIL_DOMAIN = "mounviewmw.com";
+const SCHOOL_EMAIL_DOMAIN = "mountviewmw.com";
 
 const MAX_BULK_USERS = 100;
 
-type UserRole = "administrator" | "editor" | "staff";
+/*
+|--------------------------------------------------------------------------
+| ROLE TYPES
+|--------------------------------------------------------------------------
+|
+| Every role below maps 1:1 to a value stored on the backend `users.role`
+| column. The sidebar uses the same names to decide what menu items and
+| modules a signed-in user can reach.
+|
+*/
+type UserRole =
+  | "administrator"
+  | "editor"
+  | "staff"
+  | "headteacher"
+  | "admissions_officer";
+
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "staff", label: "Staff" },
+  { value: "editor", label: "Editor" },
+  { value: "headteacher", label: "Headteacher" },
+  { value: "admissions_officer", label: "Admissions Officer" },
+  { value: "administrator", label: "Administrator" },
+];
 
 interface UserRecord {
   id: number;
@@ -96,6 +119,26 @@ type ActionType =
   | "resend-activation"
   | "delete";
 
+/*
+|--------------------------------------------------------------------------
+| Action Menu State
+|--------------------------------------------------------------------------
+|
+| We store the open menu together with the viewport coordinates where it
+| should be rendered. The dropdown itself is rendered with position: fixed
+| so it is never clipped by the table's overflow container.
+|
+*/
+interface ActionMenuState {
+  user: UserRecord;
+  top: number;
+  left: number;
+}
+
+const ACTION_MENU_WIDTH = 224; // w-56
+const ACTION_MENU_HEIGHT = 200; // conservative estimate
+const ACTION_MENU_OFFSET = 6;
+
 function createBulkRow(): BulkUser {
   return {
     id:
@@ -108,22 +151,72 @@ function createBulkRow(): BulkUser {
   };
 }
 
+/*
+|--------------------------------------------------------------------------
+| ROLE HELPERS
+|--------------------------------------------------------------------------
+|
+| normalizeRole collapses any of the incoming spellings into one of the
+| canonical role values used by the frontend. Anything unrecognised
+| returns null so the caller can decide on a fallback.
+|
+*/
 function normalizeRole(value: string): UserRole | null {
-  const role = value.trim().toLowerCase();
+  const role = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
-  if (role === "administrator" || role === "admin") {
-    return "administrator";
+  switch (role) {
+    case "administrator":
+    case "admin":
+      return "administrator";
+
+    case "editor":
+      return "editor";
+
+    case "staff":
+      return "staff";
+
+    case "headteacher":
+    case "head_teacher":
+    case "head":
+    case "principal":
+      return "headteacher";
+
+    case "admissions_officer":
+    case "admission_officer":
+    case "admissions":
+      return "admissions_officer";
+
+    default:
+      return null;
+  }
+}
+
+/*
+|--------------------------------------------------------------------------
+| ROLE LABEL
+|--------------------------------------------------------------------------
+|
+| Returns a human readable label for a role coming from the API. Any role
+| we don't know about is prettified (snake_case → Title Case) so the UI
+| never shows raw enum values.
+|
+*/
+function roleLabel(role?: string | null): string {
+  if (!role) return "—";
+
+  const normalized = normalizeRole(role);
+
+  if (normalized) {
+    const match = ROLE_OPTIONS.find((option) => option.value === normalized);
+    if (match) return match.label;
   }
 
-  if (role === "editor") {
-    return "editor";
-  }
-
-  if (role === "staff") {
-    return "staff";
-  }
-
-  return null;
+  // Fallback: turn "some_role" into "Some Role".
+  return role
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function normalizeEmailUsername(value: string): string {
@@ -187,16 +280,22 @@ export default function UsersPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [bulkMode, setBulkMode] = useState<"manual" | "csv">("manual");
 
-  const [bulkUsers, setBulkUsers] = useState<BulkUser[]>([
-    createBulkRow(),
-  ]);
+  const [bulkUsers, setBulkUsers] = useState<BulkUser[]>([createBulkRow()]);
 
   const [csvFileName, setCsvFileName] = useState("");
   const [csvError, setCsvError] = useState("");
 
   const [submittingBulk, setSubmittingBulk] = useState(false);
 
-  const [actionMenu, setActionMenu] = useState<number | null>(null);
+  /*
+  |--------------------------------------------------------------------------
+  | Action Menu
+  |--------------------------------------------------------------------------
+  |
+  | Fixed-position dropdown so it is never clipped by the table.
+  |
+  */
+  const [actionMenu, setActionMenu] = useState<ActionMenuState | null>(null);
   const [processingAction, setProcessingAction] = useState<string | null>(
     null
   );
@@ -228,6 +327,26 @@ export default function UsersPage() {
     typeof window !== "undefined"
       ? localStorage.getItem("admin_token")
       : null;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Close the action menu when the user scrolls or resizes the viewport.
+  | The menu is fixed-positioned, so a stale coordinate would look wrong.
+  |--------------------------------------------------------------------------
+  */
+  useEffect(() => {
+    if (!actionMenu) return;
+
+    const close = () => setActionMenu(null);
+
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [actionMenu]);
 
   /*
   |--------------------------------------------------------------------------
@@ -270,9 +389,7 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data?.message || "Unable to load the users."
-        );
+        throw new Error(data?.message || "Unable to load the users.");
       }
 
       setUsers(Array.isArray(data.data) ? data.data : []);
@@ -297,6 +414,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     loadUsers(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -305,6 +423,7 @@ export default function UsersPage() {
     }, 350);
 
     return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, roleFilter, statusFilter]);
 
   /*
@@ -347,9 +466,7 @@ export default function UsersPage() {
       return;
     }
 
-    setBulkUsers((current) =>
-      current.filter((user) => user.id !== id)
-    );
+    setBulkUsers((current) => current.filter((user) => user.id !== id));
   }
 
   function updateBulkUser(
@@ -416,18 +533,6 @@ export default function UsersPage() {
     return emails;
   }, [users]);
 
-  /*
-  |--------------------------------------------------------------------------
-  | IMPORTANT:
-  |
-  | Existing-user checking from the current page is useful for immediate
-  | feedback, but the Laravel backend MUST also check the entire database.
-  |
-  | We also make a request to the backend when submitting, so duplicate
-  | emails on another pagination page are still caught.
-  |--------------------------------------------------------------------------
-  */
-
   function getBulkRowError(user: BulkUser): string | null {
     const username = normalizeEmailUsername(user.emailUsername);
 
@@ -458,23 +563,13 @@ export default function UsersPage() {
 
   const validBulkUserCount = useMemo(() => {
     return bulkUsers.filter((user) => !getBulkRowError(user)).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bulkUsers, duplicateBulkEmails, existingEmails]);
 
   /*
   |--------------------------------------------------------------------------
   | CSV Import
   |--------------------------------------------------------------------------
-  |
-  | Expected CSV:
-  |
-  | name,email,role
-  | John Banda,john.banda,staff
-  | Mary Phiri,mary.phiri,editor
-  |
-  | Full email addresses are also accepted:
-  |
-  | john.banda@mounviewmw.com
-  |
   */
 
   function parseCSVLine(line: string): string[] {
@@ -555,12 +650,6 @@ export default function UsersPage() {
             continue;
           }
 
-          /*
-           * Accept:
-           * john.banda
-           * john.banda@mounviewmw.com
-           */
-
           if (email.includes("@")) {
             const domain = email.split("@")[1];
 
@@ -632,6 +721,8 @@ export default function UsersPage() {
       "name,email,role",
       `John Banda,john.banda,staff`,
       `Mary Phiri,mary.phiri,editor`,
+      `Grace Tembo,grace.tembo,headteacher`,
+      `Patrick Chirwa,patrick.chirwa,admissions_officer`,
       `Peter Mbewe,peter.mbewe,staff`,
     ].join("\n");
 
@@ -714,9 +805,7 @@ export default function UsersPage() {
       const data: BulkResponse = await response.json();
 
       if (!response.ok && !data.results) {
-        throw new Error(
-          data?.message || "Unable to create the users."
-        );
+        throw new Error(data?.message || "Unable to create the users.");
       }
 
       setBulkResults(data.results || []);
@@ -736,13 +825,10 @@ export default function UsersPage() {
       );
 
       setResultMessage(
-        data.message ||
-          "The bulk user creation process has finished."
+        data.message || "The bulk user creation process has finished."
       );
 
-      setResultType(
-        data.summary?.failed ? "error" : "success"
-      );
+      setResultType(data.summary?.failed ? "error" : "success");
 
       setShowAddModal(false);
       setShowResultModal(true);
@@ -767,20 +853,62 @@ export default function UsersPage() {
 
   /*
   |--------------------------------------------------------------------------
+  | Action Menu
+  |--------------------------------------------------------------------------
+  */
+
+  function openActionMenu(
+    user: UserRecord,
+    event: React.MouseEvent<HTMLButtonElement>
+  ) {
+    // Compute a viewport-safe position for the fixed-position menu.
+    const rect = event.currentTarget.getBoundingClientRect();
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Align the right edge of the menu to the right edge of the button,
+    // but keep it inside the viewport.
+    let left = rect.right - ACTION_MENU_WIDTH;
+
+    if (left < 8) left = 8;
+    if (left + ACTION_MENU_WIDTH > viewportWidth - 8) {
+      left = viewportWidth - ACTION_MENU_WIDTH - 8;
+    }
+
+    // Prefer opening downward. Flip up if there is not enough space.
+    const spaceBelow = viewportHeight - rect.bottom - ACTION_MENU_OFFSET;
+
+    let top: number;
+
+    if (spaceBelow < ACTION_MENU_HEIGHT) {
+      top = Math.max(8, rect.top - ACTION_MENU_HEIGHT - ACTION_MENU_OFFSET);
+    } else {
+      top = rect.bottom + ACTION_MENU_OFFSET;
+    }
+
+    setActionMenu({ user, top, left });
+  }
+
+  function closeActionMenu() {
+    setActionMenu(null);
+  }
+
+  /*
+  |--------------------------------------------------------------------------
   | Individual User Management
   |--------------------------------------------------------------------------
   */
 
   function openEditUser(user: UserRecord) {
-    setActionMenu(null);
+    closeActionMenu();
 
     setEditingUser(user);
 
     setEditForm({
       name: user.name,
       email: user.email,
-      role:
-        normalizeRole(user.role) || "staff",
+      role: normalizeRole(user.role) || "staff",
       is_active: user.is_active,
     });
   }
@@ -814,9 +942,7 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data?.message || "Unable to update the user."
-        );
+        throw new Error(data?.message || "Unable to update the user.");
       }
 
       setEditingUser(null);
@@ -843,11 +969,8 @@ export default function UsersPage() {
     }
   }
 
-  async function performAction(
-    user: UserRecord,
-    action: ActionType
-  ) {
-    setActionMenu(null);
+  async function performAction(user: UserRecord, action: ActionType) {
+    closeActionMenu();
 
     const actionKey = `${action}-${user.id}`;
     setProcessingAction(actionKey);
@@ -918,9 +1041,7 @@ export default function UsersPage() {
     } catch (error) {
       setResultTitle("Action Failed");
       setResultMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong."
+        error instanceof Error ? error.message : "Something went wrong."
       );
       setResultType("error");
       setShowResultModal(true);
@@ -1005,9 +1126,7 @@ export default function UsersPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Active
-              </p>
+              <p className="text-sm font-medium text-slate-500">Active</p>
 
               <p className="mt-2 text-3xl font-bold text-emerald-600">
                 {activeUsers}
@@ -1023,9 +1142,7 @@ export default function UsersPage() {
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">
-                Inactive
-              </p>
+              <p className="text-sm font-medium text-slate-500">Inactive</p>
 
               <p className="mt-2 text-3xl font-bold text-amber-600">
                 {inactiveUsers}
@@ -1040,7 +1157,7 @@ export default function UsersPage() {
       </div>
 
       {/* Users Listing */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         {/* Filters */}
         <div className="border-b border-slate-200 p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_180px_auto]">
@@ -1059,15 +1176,18 @@ export default function UsersPage() {
               />
             </div>
 
+            {/* Role filter — includes Headteacher and Admissions Officer */}
             <select
               value={roleFilter}
               onChange={(event) => setRoleFilter(event.target.value)}
               className="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-[#252B68] focus:bg-white"
             >
               <option value="">All roles</option>
-              <option value="administrator">Administrator</option>
-              <option value="editor">Editor</option>
-              <option value="staff">Staff</option>
+              {ROLE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
 
             <select
@@ -1101,10 +1221,7 @@ export default function UsersPage() {
         {loading ? (
           <div className="flex min-h-[320px] items-center justify-center">
             <div className="flex items-center gap-3 text-sm text-slate-500">
-              <Loader2
-                size={20}
-                className="animate-spin text-[#F58220]"
-              />
+              <Loader2 size={20} className="animate-spin text-[#F58220]" />
               Loading users...
             </div>
           </div>
@@ -1166,7 +1283,9 @@ export default function UsersPage() {
                 <tbody className="divide-y divide-slate-100">
                   {users.map((user) => {
                     const isProcessing =
-                      processingAction?.endsWith(`-${user.id}`);
+                      processingAction?.endsWith(`-${user.id}`) ?? false;
+
+                    const isMenuOpen = actionMenu?.user.id === user.id;
 
                     return (
                       <tr
@@ -1189,7 +1308,6 @@ export default function UsersPage() {
                               <p className="font-semibold text-[#172033]">
                                 {user.name}
                               </p>
-
                             </div>
                           </div>
                         </td>
@@ -1199,10 +1317,8 @@ export default function UsersPage() {
                         </td>
 
                         <td className="px-5 py-4">
-                          <span className="inline-flex rounded-full bg-[#252B68]/10 px-3 py-1 text-xs font-semibold capitalize text-[#252B68]">
-                            {user.role === "administrator"
-                              ? "Administrator"
-                              : user.role}
+                          <span className="inline-flex rounded-full bg-[#252B68]/10 px-3 py-1 text-xs font-semibold text-[#252B68]">
+                            {roleLabel(user.role)}
                           </span>
                         </td>
 
@@ -1225,85 +1341,29 @@ export default function UsersPage() {
                         </td>
 
                         <td className="px-5 py-4 text-right">
-                          <div className="relative inline-block">
-                            <button
-                              type="button"
-                              disabled={Boolean(isProcessing)}
-                              onClick={() =>
-                                setActionMenu(
-                                  actionMenu === user.id
-                                    ? null
-                                    : user.id
-                                )
-                              }
-                              className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-[#252B68] disabled:opacity-50"
-                            >
-                              {isProcessing ? (
-                                <Loader2
-                                  size={19}
-                                  className="animate-spin"
-                                />
-                              ) : (
-                                <MoreVertical size={19} />
-                              )}
-                            </button>
-
-                            {actionMenu === user.id && (
-                              <div className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl">
-                                <button
-                                  type="button"
-                                  onClick={() => openEditUser(user)}
-                                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                                >
-                                  <Pencil size={16} />
-                                  Edit Account
-                                </button>
-
-                                {user.is_active ? (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      performAction(
-                                        user,
-                                        "reset-password"
-                                      )
-                                    }
-                                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                                  >
-                                    <KeyRound size={16} />
-                                    Reset Password
-                                  </button>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      performAction(
-                                        user,
-                                        "resend-activation"
-                                      )
-                                    }
-                                    className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                                  >
-                                    <Mail size={16} />
-                                    Resend Activation
-                                  </button>
-                                )}
-
-                                <div className="my-1 border-t border-slate-100" />
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setShowDeleteModal(user)
-                                  }
-                                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 size={16} />
-                                  Delete Account
-                                </button>
-                              </div>
+                          <button
+                            type="button"
+                            disabled={isProcessing}
+                            onClick={(event) =>
+                              isMenuOpen
+                                ? closeActionMenu()
+                                : openActionMenu(user, event)
+                            }
+                            className={`rounded-lg p-2 transition disabled:opacity-50 ${
+                              isMenuOpen
+                                ? "bg-[#252B68] text-white hover:bg-[#1d2255]"
+                                : "text-slate-500 hover:bg-slate-100 hover:text-[#252B68]"
+                            }`}
+                            aria-label="Open user actions"
+                            aria-haspopup="menu"
+                            aria-expanded={isMenuOpen}
+                          >
+                            {isProcessing ? (
+                              <Loader2 size={19} className="animate-spin" />
+                            ) : (
+                              <MoreVertical size={19} />
                             )}
-                          </div>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1330,9 +1390,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   disabled={pagination.current_page <= 1}
-                  onClick={() =>
-                    loadUsers(pagination.current_page - 1)
-                  }
+                  onClick={() => loadUsers(pagination.current_page - 1)}
                   className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ChevronLeft size={16} />
@@ -1340,18 +1398,13 @@ export default function UsersPage() {
                 </button>
 
                 <span className="px-2 text-sm text-slate-500">
-                  Page {pagination.current_page} of{" "}
-                  {pagination.last_page}
+                  Page {pagination.current_page} of {pagination.last_page}
                 </span>
 
                 <button
                   type="button"
-                  disabled={
-                    pagination.current_page >= pagination.last_page
-                  }
-                  onClick={() =>
-                    loadUsers(pagination.current_page + 1)
-                  }
+                  disabled={pagination.current_page >= pagination.last_page}
+                  onClick={() => loadUsers(pagination.current_page + 1)}
                   className="inline-flex h-9 items-center gap-1 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Next
@@ -1362,6 +1415,86 @@ export default function UsersPage() {
           </>
         )}
       </div>
+
+      {/*
+      |--------------------------------------------------------------------------
+      | FIXED-POSITION ACTION MENU
+      |--------------------------------------------------------------------------
+      */}
+
+      {actionMenu && (
+        <>
+          {/* Invisible click-catcher closes the menu when clicking anywhere. */}
+          <button
+            type="button"
+            aria-label="Close actions menu"
+            onClick={closeActionMenu}
+            className="fixed inset-0 z-[140] cursor-default bg-transparent"
+          />
+
+          <div
+            role="menu"
+            style={{
+              position: "fixed",
+              top: actionMenu.top,
+              left: actionMenu.left,
+              width: ACTION_MENU_WIDTH,
+            }}
+            className="z-[150] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-2xl"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => openEditUser(actionMenu.user)}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+            >
+              <Pencil size={16} />
+              Edit Account
+            </button>
+
+            {actionMenu.user.is_active ? (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() =>
+                  performAction(actionMenu.user, "reset-password")
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                <KeyRound size={16} />
+                Reset Password
+              </button>
+            ) : (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() =>
+                  performAction(actionMenu.user, "resend-activation")
+                }
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+              >
+                <Mail size={16} />
+                Resend Activation
+              </button>
+            )}
+
+            <div className="my-1 border-t border-slate-100" />
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setShowDeleteModal(actionMenu.user);
+                closeActionMenu();
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50"
+            >
+              <Trash2 size={16} />
+              Delete Account
+            </button>
+          </div>
+        </>
+      )}
 
       {/* ================================================================ */}
       {/* ADD USERS MODAL                                                   */}
@@ -1460,10 +1593,7 @@ export default function UsersPage() {
 
                         <p className="mt-1 text-xs text-slate-500">
                           Example:{" "}
-                          <span className="font-medium">
-                            john.banda
-                          </span>{" "}
-                          →{" "}
+                          <span className="font-medium">john.banda</span> →{" "}
                           <span className="font-medium">
                             john.banda@{SCHOOL_EMAIL_DOMAIN}
                           </span>
@@ -1475,10 +1605,7 @@ export default function UsersPage() {
                   {/* Error */}
                   {csvError && (
                     <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-                      <AlertCircle
-                        size={18}
-                        className="mt-0.5 shrink-0"
-                      />
+                      <AlertCircle size={18} className="mt-0.5 shrink-0" />
 
                       <p>{csvError}</p>
                     </div>
@@ -1501,7 +1628,7 @@ export default function UsersPage() {
                             School Email
                           </th>
 
-                          <th className="w-44 px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                          <th className="w-52 px-3 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
                             Role
                           </th>
 
@@ -1513,12 +1640,9 @@ export default function UsersPage() {
                         {bulkUsers.map((user, index) => {
                           const rowError = getBulkRowError(user);
 
-                          const email =
-                            user.emailUsername.trim()
-                              ? fullSchoolEmail(
-                                  user.emailUsername
-                                )
-                              : "";
+                          const email = user.emailUsername.trim()
+                            ? fullSchoolEmail(user.emailUsername)
+                            : "";
 
                           return (
                             <tr key={user.id}>
@@ -1538,19 +1662,14 @@ export default function UsersPage() {
                                     )
                                   }
                                   placeholder="e.g. John Banda"
-                                  className={`h-11 w-full rounded-xl border bg-white px-3 text-sm outline-none transition focus:ring-2 ${
-                                    !user.name.trim()
-                                      ? "border-slate-200 focus:border-[#252B68] focus:ring-[#252B68]/10"
-                                      : "border-slate-200 focus:border-[#252B68] focus:ring-[#252B68]/10"
-                                  }`}
+                                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none transition focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                                 />
 
-                                {rowError &&
-                                  !user.name.trim() && (
-                                    <p className="mt-1 text-xs text-red-600">
-                                      Name is required.
-                                    </p>
-                                  )}
+                                {rowError && !user.name.trim() && (
+                                  <p className="mt-1 text-xs text-red-600">
+                                    Name is required.
+                                  </p>
+                                )}
                               </td>
 
                               <td className="px-3 py-3 align-top">
@@ -1568,15 +1687,9 @@ export default function UsersPage() {
                                     placeholder="john.banda"
                                     className={`min-w-0 flex-1 rounded-l-xl border px-3 text-sm outline-none transition focus:ring-2 ${
                                       rowError &&
-                                      (rowError.includes(
-                                        "already"
-                                      ) ||
-                                        rowError.includes(
-                                          "duplicated"
-                                        ) ||
-                                        rowError.includes(
-                                          "Email"
-                                        ))
+                                      (rowError.includes("already") ||
+                                        rowError.includes("duplicated") ||
+                                        rowError.includes("Email"))
                                         ? "border-red-300 bg-red-50 focus:border-red-400 focus:ring-red-100"
                                         : "border-slate-200 bg-white focus:border-[#252B68] focus:ring-[#252B68]/10"
                                     }`}
@@ -1601,6 +1714,7 @@ export default function UsersPage() {
                               </td>
 
                               <td className="px-3 py-3 align-top">
+                                {/* Role select includes Headteacher and Admissions Officer */}
                                 <select
                                   value={user.role}
                                   onChange={(event) =>
@@ -1612,29 +1726,22 @@ export default function UsersPage() {
                                   }
                                   className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                                 >
-                                  <option value="staff">
-                                    Staff
-                                  </option>
-
-                                  <option value="editor">
-                                    Editor
-                                  </option>
-
-                                  <option value="administrator">
-                                    Administrator
-                                  </option>
+                                  {ROLE_OPTIONS.map((option) => (
+                                    <option
+                                      key={option.value}
+                                      value={option.value}
+                                    >
+                                      {option.label}
+                                    </option>
+                                  ))}
                                 </select>
                               </td>
 
                               <td className="px-3 py-3 text-center align-top">
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    removeBulkRow(user.id)
-                                  }
-                                  disabled={
-                                    bulkUsers.length === 1
-                                  }
+                                  onClick={() => removeBulkRow(user.id)}
+                                  disabled={bulkUsers.length === 1}
                                   className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
                                   title="Remove row"
                                 >
@@ -1650,15 +1757,12 @@ export default function UsersPage() {
 
                   {/* Existing / duplicate warning summary */}
                   {(duplicateBulkEmails.size > 0 ||
-                    bulkUsers.some(
-                      (user) =>
-                        existingEmails.has(
-                          fullSchoolEmail(
-                            normalizeEmailUsername(
-                              user.emailUsername
-                            )
-                          )
+                    bulkUsers.some((user) =>
+                      existingEmails.has(
+                        fullSchoolEmail(
+                          normalizeEmailUsername(user.emailUsername)
                         )
+                      )
                     )) && (
                     <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
                       <div className="flex items-start gap-3">
@@ -1673,9 +1777,9 @@ export default function UsersPage() {
                           </p>
 
                           <p className="mt-1 text-sm text-amber-700">
-                            An email address already exists or has
-                            been entered more than once. Please fix
-                            the highlighted row before continuing.
+                            An email address already exists or has been
+                            entered more than once. Please fix the
+                            highlighted row before continuing.
                           </p>
                         </div>
                       </div>
@@ -1687,9 +1791,7 @@ export default function UsersPage() {
                     <button
                       type="button"
                       onClick={addBulkRow}
-                      disabled={
-                        bulkUsers.length >= MAX_BULK_USERS
-                      }
+                      disabled={bulkUsers.length >= MAX_BULK_USERS}
                       className="inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-[#252B68]/30 px-4 py-2.5 text-sm font-semibold text-[#252B68] transition hover:border-[#252B68] hover:bg-[#252B68]/5 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Plus size={17} />
@@ -1706,10 +1808,7 @@ export default function UsersPage() {
                   {/* CSV import */}
                   <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
                     <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white shadow-sm">
-                      <Upload
-                        size={24}
-                        className="text-[#252B68]"
-                      />
+                      <Upload size={24} className="text-[#252B68]" />
                     </div>
 
                     <h3 className="mt-4 text-base font-bold text-[#172033]">
@@ -1717,13 +1816,9 @@ export default function UsersPage() {
                     </h3>
 
                     <p className="mx-auto mt-1 max-w-lg text-sm leading-relaxed text-slate-500">
-                      Upload a CSV containing the user name, school
-                      email username and role. The system will
-                      automatically apply{" "}
-                      <strong>
-                        @{SCHOOL_EMAIL_DOMAIN}
-                      </strong>
-                      .
+                      Upload a CSV containing the user name, school email
+                      username and role. The system will automatically apply{" "}
+                      <strong>@{SCHOOL_EMAIL_DOMAIN}</strong>.
                     </p>
 
                     <div className="mt-5 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -1770,13 +1865,21 @@ export default function UsersPage() {
 {`name,email,role
 John Banda,john.banda,staff
 Mary Phiri,mary.phiri,editor
-Peter Mbewe,peter.mbewe,staff`}
+Grace Tembo,grace.tembo,headteacher
+Patrick Chirwa,patrick.chirwa,admissions_officer`}
                       </code>
                     </div>
 
                     <p className="mt-3 text-xs leading-relaxed text-slate-500">
-                      You may also provide the full school email,
-                      for example{" "}
+                      Accepted roles:{" "}
+                      <span className="font-semibold">staff</span>,{" "}
+                      <span className="font-semibold">editor</span>,{" "}
+                      <span className="font-semibold">headteacher</span>,{" "}
+                      <span className="font-semibold">
+                        admissions_officer
+                      </span>
+                      , <span className="font-semibold">administrator</span>.
+                      You may also provide the full school email, for example{" "}
                       <span className="font-semibold">
                         john.banda@{SCHOOL_EMAIL_DOMAIN}
                       </span>
@@ -1786,10 +1889,7 @@ Peter Mbewe,peter.mbewe,staff`}
 
                   {csvError && (
                     <div className="mt-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3.5 text-sm text-red-700">
-                      <AlertCircle
-                        size={18}
-                        className="mt-0.5 shrink-0"
-                      />
+                      <AlertCircle size={18} className="mt-0.5 shrink-0" />
 
                       <p>{csvError}</p>
                     </div>
@@ -1805,8 +1905,7 @@ Peter Mbewe,peter.mbewe,staff`}
                           </h3>
 
                           <p className="text-xs text-slate-500">
-                            Review the users before creating their
-                            accounts.
+                            Review the users before creating their accounts.
                           </p>
                         </div>
 
@@ -1847,8 +1946,7 @@ Peter Mbewe,peter.mbewe,staff`}
 
                           <tbody className="divide-y divide-slate-100">
                             {bulkUsers.map((user, index) => {
-                              const error =
-                                getBulkRowError(user);
+                              const error = getBulkRowError(user);
 
                               return (
                                 <tr key={user.id}>
@@ -1862,14 +1960,12 @@ Peter Mbewe,peter.mbewe,staff`}
 
                                   <td className="px-4 py-3 text-sm text-slate-600">
                                     {user.emailUsername
-                                      ? fullSchoolEmail(
-                                          user.emailUsername
-                                        )
+                                      ? fullSchoolEmail(user.emailUsername)
                                       : "—"}
                                   </td>
 
-                                  <td className="px-4 py-3 text-sm capitalize text-slate-600">
-                                    {user.role}
+                                  <td className="px-4 py-3 text-sm text-slate-600">
+                                    {roleLabel(user.role)}
                                   </td>
 
                                   <td className="px-4 py-3">
@@ -1904,8 +2000,7 @@ Peter Mbewe,peter.mbewe,staff`}
                   {validBulkUserCount}
                 </span>{" "}
                 user
-                {validBulkUserCount === 1 ? "" : "s"} ready to
-                create
+                {validBulkUserCount === 1 ? "" : "s"} ready to create
               </div>
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row">
@@ -1921,18 +2016,12 @@ Peter Mbewe,peter.mbewe,staff`}
                 <button
                   type="button"
                   onClick={submitBulkUsers}
-                  disabled={
-                    submittingBulk ||
-                    validBulkUserCount === 0
-                  }
+                  disabled={submittingBulk || validBulkUserCount === 0}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#F58220] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#F58220]/20 transition hover:bg-[#df7014] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submittingBulk ? (
                     <>
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
+                      <Loader2 size={17} className="animate-spin" />
                       Creating Users...
                     </>
                   ) : (
@@ -1954,7 +2043,7 @@ Peter Mbewe,peter.mbewe,staff`}
       {/* ================================================================ */}
 
       {editingUser && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[160] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
               <div>
@@ -2021,6 +2110,7 @@ Peter Mbewe,peter.mbewe,staff`}
                     Role
                   </label>
 
+                  {/* Role select includes Headteacher and Admissions Officer */}
                   <select
                     value={editForm.role}
                     onChange={(event) =>
@@ -2031,11 +2121,11 @@ Peter Mbewe,peter.mbewe,staff`}
                     }
                     className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                   >
-                    <option value="staff">Staff</option>
-                    <option value="editor">Editor</option>
-                    <option value="administrator">
-                      Administrator
-                    </option>
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -2059,16 +2149,12 @@ Peter Mbewe,peter.mbewe,staff`}
                       }))
                     }
                     className={`relative h-6 w-11 rounded-full transition ${
-                      editForm.is_active
-                        ? "bg-emerald-500"
-                        : "bg-slate-300"
+                      editForm.is_active ? "bg-emerald-500" : "bg-slate-300"
                     }`}
                   >
                     <span
                       className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${
-                        editForm.is_active
-                          ? "left-6"
-                          : "left-1"
+                        editForm.is_active ? "left-6" : "left-1"
                       }`}
                     />
                   </button>
@@ -2086,19 +2172,12 @@ Peter Mbewe,peter.mbewe,staff`}
 
                 <button
                   type="submit"
-                  disabled={
-                    processingAction ===
-                    `edit-${editingUser.id}`
-                  }
+                  disabled={processingAction === `edit-${editingUser.id}`}
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#252B68] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#1d2255] disabled:opacity-50"
                 >
-                  {processingAction ===
-                  `edit-${editingUser.id}` ? (
+                  {processingAction === `edit-${editingUser.id}` ? (
                     <>
-                      <Loader2
-                        size={17}
-                        className="animate-spin"
-                      />
+                      <Loader2 size={17} className="animate-spin" />
                       Saving...
                     </>
                   ) : (
@@ -2116,7 +2195,7 @@ Peter Mbewe,peter.mbewe,staff`}
       {/* ================================================================ */}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[170] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="p-6">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-50">
@@ -2147,22 +2226,15 @@ Peter Mbewe,peter.mbewe,staff`}
 
               <button
                 type="button"
-                onClick={() =>
-                  performAction(showDeleteModal, "delete")
-                }
+                onClick={() => performAction(showDeleteModal, "delete")}
                 disabled={
-                  processingAction ===
-                  `delete-${showDeleteModal.id}`
+                  processingAction === `delete-${showDeleteModal.id}`
                 }
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
-                {processingAction ===
-                `delete-${showDeleteModal.id}` ? (
+                {processingAction === `delete-${showDeleteModal.id}` ? (
                   <>
-                    <Loader2
-                      size={17}
-                      className="animate-spin"
-                    />
+                    <Loader2 size={17} className="animate-spin" />
                     Deleting...
                   </>
                 ) : (
@@ -2182,26 +2254,18 @@ Peter Mbewe,peter.mbewe,staff`}
       {/* ================================================================ */}
 
       {showResultModal && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[180] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="p-6">
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                  resultType === "success"
-                    ? "bg-emerald-50"
-                    : "bg-red-50"
+                  resultType === "success" ? "bg-emerald-50" : "bg-red-50"
                 }`}
               >
                 {resultType === "success" ? (
-                  <CheckCircle2
-                    size={23}
-                    className="text-emerald-600"
-                  />
+                  <CheckCircle2 size={23} className="text-emerald-600" />
                 ) : (
-                  <AlertCircle
-                    size={23}
-                    className="text-red-600"
-                  />
+                  <AlertCircle size={23} className="text-red-600" />
                 )}
               </div>
 
@@ -2222,9 +2286,7 @@ Peter Mbewe,peter.mbewe,staff`}
                         {bulkSummary.total}
                       </p>
 
-                      <p className="text-xs text-slate-500">
-                        Total
-                      </p>
+                      <p className="text-xs text-slate-500">Total</p>
                     </div>
 
                     <div className="rounded-xl bg-emerald-50 p-3 text-center">
@@ -2232,9 +2294,7 @@ Peter Mbewe,peter.mbewe,staff`}
                         {bulkSummary.successful}
                       </p>
 
-                      <p className="text-xs text-emerald-700">
-                        Created
-                      </p>
+                      <p className="text-xs text-emerald-700">Created</p>
                     </div>
 
                     <div className="rounded-xl bg-red-50 p-3 text-center">
@@ -2242,9 +2302,7 @@ Peter Mbewe,peter.mbewe,staff`}
                         {bulkSummary.failed}
                       </p>
 
-                      <p className="text-xs text-red-700">
-                        Failed
-                      </p>
+                      <p className="text-xs text-red-700">Failed</p>
                     </div>
                   </div>
 
@@ -2309,16 +2367,6 @@ Peter Mbewe,peter.mbewe,staff`}
             </div>
           </div>
         </div>
-      )}
-
-      {/* Close action menu when clicking elsewhere */}
-      {actionMenu !== null && (
-        <button
-          type="button"
-          aria-label="Close menu"
-          onClick={() => setActionMenu(null)}
-          className="fixed inset-0 z-20 cursor-default"
-        />
       )}
     </div>
   );

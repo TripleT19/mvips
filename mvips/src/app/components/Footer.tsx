@@ -1,3 +1,6 @@
+"use client";
+
+import NewsletterSubscribeForm from "./NewsletterSubscribeForm";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -7,6 +10,7 @@ const exploreLinks = [
   { name: "Admissions", href: "/admissions" },
   { name: "School Life", href: "/school-life" },
   { name: "News & Stories", href: "/news" },
+  { name: "Newsletters", href: "/newsletters" },
   { name: "Gallery", href: "/gallery" },
 ];
 
@@ -20,7 +24,37 @@ const learningLinks = [
 export default function Footer() {
   return (
     <footer className="bg-[#171B4A] text-white">
-      {/* MAIN FOOTER */}
+      {/* =========================================================
+          SUBSCRIBE BAND
+      ========================================================== */}
+      <div className="border-b border-white/10 bg-[#252B68]">
+        <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-14">
+          <div className="grid items-center gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
+                Newsletter Subscription
+              </p>
+
+              <h3 className="mt-3 text-2xl font-black leading-tight text-white sm:text-3xl">
+                Get every newsletter in your inbox.
+              </h3>
+
+              <p className="mt-3 max-w-xl text-sm leading-7 text-blue-100 sm:text-base">
+                Subscribe once and receive each new edition the moment it&apos;s
+                published. No spam — just school news, events and achievements.
+              </p>
+            </div>
+
+            <div>
+              <NewsletterSubscribeForm variant="dark" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================
+          MAIN FOOTER
+      ========================================================== */}
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-[1.4fr_0.8fr_0.8fr_1fr]">
           {/* SCHOOL BRAND */}
@@ -62,13 +96,20 @@ export default function Footer() {
                 Fostering growth, excellence and empathy.
               </p>
             </div>
+
+            {/* QUICK SUBSCRIBE SHORTCUT */}
+            <Link
+              href="/newsletters"
+              className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-[#FFE900] transition hover:text-white"
+            >
+              Browse the newsletter archive
+              <span>→</span>
+            </Link>
           </div>
 
           {/* EXPLORE */}
           <div>
-            <h3 className="text-lg font-bold text-[#FFE900]">
-              Explore
-            </h3>
+            <h3 className="text-lg font-bold text-[#FFE900]">Explore</h3>
 
             <ul className="mt-5 space-y-3">
               {exploreLinks.map((link) => (
@@ -90,9 +131,7 @@ export default function Footer() {
 
           {/* LEARNING */}
           <div>
-            <h3 className="text-lg font-bold text-[#FFE900]">
-              Learning
-            </h3>
+            <h3 className="text-lg font-bold text-[#FFE900]">Learning</h3>
 
             <ul className="mt-5 space-y-3">
               {learningLinks.map((link, index) => (
@@ -114,9 +153,7 @@ export default function Footer() {
 
           {/* CONTACT */}
           <div>
-            <h3 className="text-lg font-bold text-[#FFE900]">
-              Contact Us
-            </h3>
+            <h3 className="text-lg font-bold text-[#FFE900]">Contact Us</h3>
 
             <div className="mt-5 space-y-4 text-sm">
               {/* LOCATION */}
@@ -165,9 +202,11 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* YELLOW BRAND STRIP */}
+      {/* =========================================================
+          YELLOW BRAND STRIP
+      ========================================================== */}
       <div className="bg-[#FFE900]">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-3 text-center sm:flex-row sm:px-6 lg:px-8 sm:text-left">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 py-3 text-center sm:flex-row sm:px-6 sm:text-left lg:px-8">
           <p className="text-sm font-bold text-[#252B68]">
             Fostering growth, excellence and empathy.
           </p>
@@ -181,7 +220,9 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* COPYRIGHT */}
+      {/* =========================================================
+          COPYRIGHT
+      ========================================================== */}
       <div className="border-t border-white/10 bg-[#171B4A]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-blue-200 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
           <p>
@@ -190,10 +231,7 @@ export default function Footer() {
           </p>
 
           <div className="flex gap-5">
-            <Link
-              href="/about"
-              className="transition hover:text-white"
-            >
+            <Link href="/about" className="transition hover:text-white">
               About
             </Link>
 
@@ -204,10 +242,11 @@ export default function Footer() {
               Admissions
             </Link>
 
-            <Link
-              href="/contact"
-              className="transition hover:text-white"
-            >
+            <Link href="/newsletters" className="transition hover:text-white">
+              Newsletters
+            </Link>
+
+            <Link href="/contact" className="transition hover:text-white">
               Contact
             </Link>
           </div>

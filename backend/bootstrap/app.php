@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\AdministratorMiddleware;
+use App\Http\Middleware\AdmissionRoleMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -23,14 +24,18 @@ return Application::configure(
         |--------------------------------------------------------------------------
         | Middleware Aliases
         |--------------------------------------------------------------------------
+        |
+        | admin          → CMS roles: administrator, editor, staff
+        | administrator  → administrator only (user management)
+        | admission.role → takes role names as parameters
+        |                  e.g. 'admission.role:principal'
+        |
         */
 
         $middleware->alias([
-            'admin' =>
-                AdminMiddleware::class,
-
-            'administrator' =>
-                AdministratorMiddleware::class,
+            'admin' => AdminMiddleware::class,
+            'administrator' => AdministratorMiddleware::class,
+            'admission.role' => AdmissionRoleMiddleware::class,
         ]);
     })
 

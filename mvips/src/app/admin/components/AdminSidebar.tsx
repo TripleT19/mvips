@@ -4,6 +4,7 @@ import {
   BookOpen,
   CalendarDays,
   ChevronRight,
+  ClipboardCheck,
   GalleryHorizontalEnd,
   GraduationCap,
   Images,
@@ -34,47 +35,66 @@ type AdminSidebarProps = {
   setMobileOpen?: (open: boolean) => void;
 };
 
-const mainNavigation = [
-  {
-    label: "Dashboard",
-    href: "/admin",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "Stories & News",
-    href: "/admin/stories",
-    icon: BookOpen,
-  },
-  {
-    label: "Events",
-    href: "/admin/events",
-    icon: CalendarDays,
-  },
-  {
-    label: "Gallery",
-    href: "/admin/gallery",
-    icon: GalleryHorizontalEnd,
-  },
-  {
-    label: "Media Library",
-    href: "/admin/media",
-    icon: Images,
-  },
+/**
+ * access:
+ *   "cms"        → always visible to any signed-in admin
+ *   "admissions" → only when canAccessAdmissions
+ *   "users"      → only when canManageUsers
+ */
+type NavItem = {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  access: "cms" | "admissions" | "users";
+};
+
+const mainNavigation: NavItem[] = [
+  { label: "Dashboard", href: "/admin", icon: LayoutDashboard, access: "cms" },
+  { label: "Admissions", href: "/admin/admissions", icon: ClipboardCheck, access: "admissions" },
+  { label: "Stories & News", href: "/admin/stories", icon: BookOpen, access: "cms" },
+  { label: "Events", href: "/admin/events", icon: CalendarDays, access: "cms" },
+  { label: "Gallery", href: "/admin/gallery", icon: GalleryHorizontalEnd, access: "cms" },
+  { label: "Media Library", href: "/admin/media", icon: Images, access: "cms" },
 ];
 
-const administrationNavigation = [
-  {
-    label: "Users",
-    href: "/admin/users",
-    icon: Users,
-    adminOnly: true,
-  },
-  {
-    label: "Settings",
-    href: "/admin/settings",
-    icon: Settings,
-  },
+const administrationNavigation: NavItem[] = [
+  { label: "Users", href: "/admin/users", icon: Users, access: "users" },
+  { label: "Settings", href: "/admin/settings", icon: Settings, access: "cms" },
 ];
+
+type RolePermissions = {
+  canAccessAdmissions: boolean;
+  canManageUsers: boolean;
+};
+
+/**
+ * Role → permission map:
+ *
+ *   administrator / admin   → CMS ✓ | Admissions ✗ | Users ✓
+ *   admissions_officer      → CMS ✓ | Admissions ✓ | Users ✗
+ *   headteacher / principal → CMS ✓ | Admissions ✓ | Users ✗
+ *   editor / staff          → CMS ✓ | Admissions ✗ | Users ✗
+ *   anything else           → CMS ✓ | Admissions ✗ | Users ✗
+ */
+function getRolePermissions(role?: string | null): RolePermissions {
+  const normalized = (role || "").toLowerCase().trim();
+
+  switch (normalized) {
+    case "administrator":
+    case "admin":
+      return { canAccessAdmissions: false, canManageUsers: true };
+
+    case "admissions_officer":
+    case "headteacher":
+    case "principal":
+      return { canAccessAdmissions: true, canManageUsers: false };
+
+    case "editor":
+    case "staff":
+    default:
+      return { canAccessAdmissions: false, canManageUsers: false };
+  }
+}
 
 function getInitials(name?: string) {
   if (!name) return "MV";
@@ -100,30 +120,41 @@ export default function AdminSidebar({
   useEffect(() => {
     try {
       const storedUser = localStorage.getItem("admin_user");
-
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
-      }
+      if (storedUser) setUser(JSON.parse(storedUser));
     } catch {
       setUser(null);
     }
   }, []);
 
-  const isAdministrator =
-    user?.role === "administrator" ||
-    user?.role === "admin";
+  /* Scroll the currently active item into view when the mobile drawer opens. */
+  useEffect(() => {
+    if (!mobileOpen) return;
+
+    const active = document.querySelector<HTMLElement>(
+      'aside a[data-active="true"]'
+    );
+
+    active?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [mobileOpen, pathname]);
+
+  const permissions = getRolePermissions(user?.role);
+
+  const canSeeItem = (item: NavItem): boolean => {
+    if (item.access === "admissions") return permissions.canAccessAdmissions;
+    if (item.access === "users") return permissions.canManageUsers;
+    return true;
+  };
+
+  const visibleMainNavigation = mainNavigation.filter(canSeeItem);
+  const visibleAdministrationNavigation =
+    administrationNavigation.filter(canSeeItem);
 
   const isActive = (href: string) => {
-    if (href === "/admin") {
-      return pathname === "/admin";
-    }
-
+    if (href === "/admin") return pathname === "/admin";
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const closeMobileSidebar = () => {
-    setMobileOpen?.(false);
-  };
+  const closeMobileSidebar = () => setMobileOpen?.(false);
 
   const handleLogout = async () => {
     if (loggingOut) return;
@@ -147,23 +178,12 @@ export default function AdminSidebar({
     } finally {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("admin_user");
-
       router.replace("/admin/login");
     }
   };
 
-  const renderNavigationItem = (
-    item: {
-      label: string;
-      href: string;
-      icon: React.ElementType;
-      adminOnly?: boolean;
-    },
-    mobile = false
-  ) => {
-    if (item.adminOnly && !isAdministrator) {
-      return null;
-    }
+  const renderNavigationItem = (item: NavItem, mobile = false) => {
+    if (!canSeeItem(item)) return null;
 
     const active = isActive(item.href);
     const Icon = item.icon;
@@ -172,6 +192,7 @@ export default function AdminSidebar({
       <Link
         key={item.href}
         href={item.href}
+        data-active={active ? "true" : "false"}
         onClick={mobile ? closeMobileSidebar : undefined}
         className={`group relative flex h-[43px] items-center gap-3 rounded-lg px-3 text-[13px] font-semibold transition-all ${
           active
@@ -193,22 +214,17 @@ export default function AdminSidebar({
           <Icon size={17} strokeWidth={2} />
         </span>
 
-        <span className="flex-1 truncate">
-          {item.label}
-        </span>
+        <span className="flex-1 truncate">{item.label}</span>
 
         {active && (
-          <ChevronRight
-            size={14}
-            className="shrink-0 text-[#252B68]"
-          />
+          <ChevronRight size={14} className="shrink-0 text-[#252B68]" />
         )}
       </Link>
     );
   };
 
   const sidebarContent = (mobile = false) => (
-    <div className="flex h-full flex-col">
+    <div className="flex min-h-full flex-col">
       {/* Brand */}
       <div className="px-4 pb-4 pt-4">
         <Link
@@ -231,11 +247,9 @@ export default function AdminSidebar({
             <p className="truncate text-[14px] font-extrabold leading-4 text-white">
               Mount View
             </p>
-
             <p className="truncate text-[10px] font-medium leading-4 text-white/55">
               International Primary School
             </p>
-
             <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-[#FFE900]">
               Administration
             </p>
@@ -246,36 +260,39 @@ export default function AdminSidebar({
       <div className="mx-4 border-t border-white/10" />
 
       {/* Main navigation */}
-      <div className="px-3 pt-4">
-        <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.15em] text-white/35">
-          Main menu
-        </p>
+      {visibleMainNavigation.length > 0 && (
+        <div className="px-3 pt-4">
+          <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.15em] text-white/35">
+            Main menu
+          </p>
 
-        <nav className="space-y-1">
-          {mainNavigation.map((item) =>
-            renderNavigationItem(item, mobile)
-          )}
-        </nav>
-      </div>
+          <nav className="space-y-1">
+            {visibleMainNavigation.map((item) =>
+              renderNavigationItem(item, mobile)
+            )}
+          </nav>
+        </div>
+      )}
 
       {/* Administration */}
-      <div className="px-3 pt-5">
-        <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.15em] text-white/35">
-          Administration
-        </p>
+      {visibleAdministrationNavigation.length > 0 && (
+        <div className="px-3 pt-5">
+          <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-[0.15em] text-white/35">
+            Administration
+          </p>
 
-        <nav className="space-y-1">
-          {administrationNavigation.map((item) =>
-            renderNavigationItem(item, mobile)
-          )}
-        </nav>
-      </div>
+          <nav className="space-y-1">
+            {visibleAdministrationNavigation.map((item) =>
+              renderNavigationItem(item, mobile)
+            )}
+          </nav>
+        </div>
+      )}
 
-      {/* Spacer */}
       <div className="flex-1" />
 
       {/* Website shortcut */}
-      <div className="px-3 pb-3">
+      <div className="px-3 pb-3 pt-4">
         <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#FFE900]/10 text-[#FFE900]">
@@ -286,7 +303,6 @@ export default function AdminSidebar({
               <p className="text-[11px] font-bold text-white">
                 School Website
               </p>
-
               <p className="truncate text-[9px] text-white/40">
                 Public website
               </p>
@@ -315,16 +331,12 @@ export default function AdminSidebar({
             <p className="truncate text-[11px] font-bold text-white">
               {user?.name || "Administrator"}
             </p>
-
             <p className="truncate text-[9px] text-white/40">
               {user?.email || "Admin account"}
             </p>
           </div>
 
-          <ShieldCheck
-            size={15}
-            className="shrink-0 text-[#FFE900]"
-          />
+          <ShieldCheck size={15} className="shrink-0 text-[#FFE900]" />
         </div>
 
         <button
@@ -344,9 +356,8 @@ export default function AdminSidebar({
     <>
       {/* Desktop */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] bg-[#171B4A] lg:block">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
-
-        <div className="relative h-full overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
+        <div className="relative h-full overflow-y-auto overscroll-contain">
           {sidebarContent(false)}
         </div>
       </aside>
@@ -364,14 +375,11 @@ export default function AdminSidebar({
       {/* Mobile */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#171B4A] shadow-2xl transition-transform duration-300 lg:hidden ${
-          mobileOpen
-            ? "translate-x-0"
-            : "-translate-x-full"
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
-
-        <div className="relative h-full">
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
+        <div className="relative h-full overflow-y-auto overscroll-contain">
           <button
             type="button"
             onClick={closeMobileSidebar}

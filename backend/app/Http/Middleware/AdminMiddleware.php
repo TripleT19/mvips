@@ -9,24 +9,26 @@ use Symfony\Component\HttpFoundation\Response;
 class AdminMiddleware
 {
     /**
-     * Allow active CMS users to access the admin portal.
+     * Roles allowed to access the general CMS module
+     * (stories, events, gallery, media, settings, dashboard).
      *
-     * Roles:
-     * - administrator
-     * - editor
-     * - staff
+     * Administrator, editor and staff have CMS access but no admissions.
+     * Admissions officers, headteachers and principals also have CMS
+     * access (alongside the admissions module).
      */
-    public function handle(
-        Request $request,
-        Closure $next
-    ): Response {
-        $user = $request->user();
+    protected array $allowedRoles = [
+        'administrator',
+        'admin',
+        'editor',
+        'staff',
+        'admissions_officer',
+        'headteacher',
+        'principal',
+    ];
 
-        /*
-        |--------------------------------------------------------------------------
-        | Must be authenticated
-        |--------------------------------------------------------------------------
-        */
+    public function handle(Request $request, Closure $next): Response
+    {
+        $user = $request->user();
 
         if (!$user) {
             return response()->json([
@@ -35,39 +37,20 @@ class AdminMiddleware
             ], 401);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Account must be active
-        |--------------------------------------------------------------------------
-        */
-
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is inactive.',
+                'message' => 'Your account has not been activated yet.',
             ], 403);
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Allowed CMS roles
-        |--------------------------------------------------------------------------
-        */
-
-        $allowedRoles = [
-            'administrator',
-            'editor',
-            'staff',
-        ];
-
-        if (!in_array($user->role, $allowedRoles, true)) {
+        if (!in_array($user->role, $this->allowedRoles, true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'You do not have access to the administration portal.',
+                'message' => 'You are not authorized to access this resource.',
             ], 403);
         }
 
         return $next($request);
     }
 }
-

@@ -1,927 +1,937 @@
 "use client";
 
 import {
-  Activity,
-  ArrowRight,
+  AlertCircle,
+  ArrowUpRight,
   BookOpen,
+  Calendar,
   CalendarDays,
   ChevronRight,
-  Clock3,
-  Eye,
+  ClipboardCheck,
+  Clock,
   FileText,
-  FolderOpen,
   GalleryHorizontalEnd,
+  GraduationCap,
   Image as ImageIcon,
-  Plus,
+  LayoutDashboard,
+  Loader2,
+  MapPin,
   RefreshCw,
-  Sparkles,
-  TrendingUp,
-  Upload,
+  UserCheck,
   Users,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-type Story = {
-  id: number;
-  title: string;
-  slug?: string;
-  status?: string;
-  published_at?: string | null;
-  created_at?: string;
-  category?: {
-    id?: number;
-    name?: string;
-    slug?: string;
-  } | null;
-  image_url?: string | null;
-};
+const ADMIN_TOKEN_KEY = "admin_token";
 
-type EventItem = {
-  id: number;
-  title: string;
-  slug?: string;
-  event_date?: string;
-  start_time?: string | null;
-  end_time?: string | null;
-  location?: string | null;
-  status?: string;
-  image_url?: string | null;
-};
+/*
+|--------------------------------------------------------------------------
+| Types
+|--------------------------------------------------------------------------
+*/
 
-type DashboardStats = {
+interface DashboardStats {
   stories: number;
-  publishedStories: number;
-  draftStories: number;
+  published_stories: number;
+  draft_stories: number;
   events: number;
-  upcomingEvents: number;
+  upcoming_events: number;
   galleries: number;
-};
+  gallery_albums: number;
+  users: number;
+  active_users: number;
+}
 
-type DashboardResponse = {
-  success?: boolean;
-  data?: {
-    stories?: {
-      total?: number;
-      published?: number;
-      drafts?: number;
-    };
-    events?: {
-      total?: number;
-      published?: number;
-      upcoming?: number;
-    };
-    gallery?: {
-      total?: number;
-      published?: number;
-    };
-    stats?: {
-      stories?: number;
-      published_stories?: number;
-      draft_stories?: number;
-      events?: number;
-      upcoming_events?: number;
-      galleries?: number;
-      gallery_albums?: number;
-    };
-    recent_stories?: Story[];
-    upcoming_events?: EventItem[];
+interface AdmissionStats {
+  total: number;
+  submitted: number;
+  document_verification: number;
+  assessments_scheduled: number;
+  assessments_completed: number;
+  awaiting_approval: number;
+  approved: number;
+  denied: number;
+  waitlisted: number;
+  enrolled: number;
+}
+
+interface RecentStory {
+  id: number;
+  title: string;
+  slug: string;
+  author: string | null;
+  status: string;
+  featured: boolean;
+  image_url: string | null;
+  category: { id: number; name: string; slug: string } | null;
+  created_at: string;
+}
+
+interface UpcomingEvent {
+  id: number;
+  title: string;
+  slug: string;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  class_name: string | null;
+  status: string;
+  featured: boolean;
+}
+
+interface RecentUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface RecentApplication {
+  id: number;
+  application_number: string;
+  legal_first_name: string;
+  middle_name: string | null;
+  legal_surname: string;
+  status: string;
+  source: string;
+  submitted: boolean;
+  submitted_at: string | null;
+  created_at: string;
+  academic_year: { id: number; name: string } | null;
+  class_applied: { id: number; name: string } | null;
+}
+
+interface DashboardData {
+  stats: DashboardStats;
+  admissions: AdmissionStats;
+  recent_stories: RecentStory[];
+  upcoming_events: UpcomingEvent[];
+  recent_users: RecentUser[];
+  recent_applications: RecentApplication[];
+}
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+function authHeaders(): HeadersInit {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem(ADMIN_TOKEN_KEY)
+      : null;
+
+  const headers: Record<string, string> = {
+    Accept: "application/json",
   };
+
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  return headers;
+}
+
+function fullName(app: {
+  legal_first_name: string;
+  middle_name?: string | null;
+  legal_surname: string;
+}) {
+  return [app.legal_first_name, app.middle_name, app.legal_surname]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return "—";
+
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+
+  try {
+    return new Date(value).toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return value;
+  }
+}
+
+function formatRelative(value: string | null | undefined) {
+  if (!value) return "—";
+
+  try {
+    const date = new Date(value);
+    const diff = Date.now() - date.getTime();
+    const minutes = Math.floor(diff / 60_000);
+
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+
+    return date.toLocaleDateString();
+  } catch {
+    return value;
+  }
+}
+
+function roleLabel(role?: string | null) {
+  if (!role) return "—";
+
+  const normalized = role.toLowerCase().replace(/[\s-]+/g, "_");
+
+  switch (normalized) {
+    case "administrator":
+    case "admin":
+      return "Administrator";
+    case "editor":
+      return "Editor";
+    case "staff":
+      return "Staff";
+    case "headteacher":
+    case "head_teacher":
+    case "principal":
+      return "Headteacher";
+    case "admissions_officer":
+    case "admission_officer":
+      return "Admissions Officer";
+    default:
+      return role
+        .split(/[_\s-]+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+        .join(" ");
+  }
+}
+
+function statusLabel(status: string) {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-700",
+  submitted: "bg-blue-50 text-blue-700",
+  document_verification: "bg-amber-50 text-amber-700",
+  assessment_scheduled: "bg-violet-50 text-violet-700",
+  assessment_completed: "bg-indigo-50 text-indigo-700",
+  principal_review: "bg-orange-50 text-orange-700",
+  approved: "bg-green-50 text-green-700",
+  denied: "bg-red-50 text-red-700",
+  waitlisted: "bg-purple-50 text-purple-700",
+  enrolled: "bg-emerald-50 text-emerald-700",
+  transferred: "bg-cyan-50 text-cyan-700",
+  withdrawn: "bg-rose-50 text-rose-700",
 };
 
-function DashboardLoading() {
-  return (
-    <div className="min-h-screen bg-[#f6f7fb] p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="h-40 animate-pulse rounded-3xl bg-white shadow-sm" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((item) => (
-            <div
-              key={item}
-              className="h-32 animate-pulse rounded-2xl bg-white shadow-sm"
-            />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function formatDate(value?: string | null) {
-  if (!value) return "No date";
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatEventDate(value?: string | null) {
-  if (!value) return "Date not set";
-
-  const date = new Date(`${value}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
-}
-
-function formatTime(value?: string | null) {
-  if (!value) return "";
-
-  const parts = value.split(":");
-
-  if (parts.length < 2) return value;
-
-  const hours = Number(parts[0]);
-  const minutes = parts[1];
-
-  if (Number.isNaN(hours)) return value;
-
-  const suffix = hours >= 12 ? "PM" : "AM";
-  const displayHour = hours % 12 || 12;
-
-  return `${displayHour}:${minutes} ${suffix}`;
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function getInitials(name?: string) {
-  if (!name) return "MV";
-
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-}
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  iconClass,
-  href,
-}: {
-  title: string;
-  value: number;
-  subtitle: string;
-  icon: React.ElementType;
-  iconClass: string;
-  href: string;
-}) {
-  return (
-    <a
-      href={href}
-      className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#252B68]/20 hover:shadow-lg"
-    >
-      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-slate-50 transition-transform duration-300 group-hover:scale-125" />
-
-      <div className="relative flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-
-          <p className="mt-2 text-3xl font-bold tracking-tight text-[#172033]">
-            {value}
-          </p>
-
-          <p className="mt-1 text-xs font-medium text-slate-400">
-            {subtitle}
-          </p>
-        </div>
-
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
-        >
-          <Icon size={21} strokeWidth={2} />
-        </div>
-      </div>
-
-      <div className="relative mt-4 flex items-center gap-1 text-xs font-semibold text-[#252B68]">
-        <span>Manage</span>
-        <ArrowRight
-          size={14}
-          className="transition-transform group-hover:translate-x-1"
-        />
-      </div>
-    </a>
-  );
-}
-
-function SectionHeader({
-  title,
-  description,
-  href,
-  linkText = "View all",
-}: {
-  title: string;
-  description: string;
-  href: string;
-  linkText?: string;
-}) {
-  return (
-    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h2 className="text-lg font-bold tracking-tight text-[#172033]">
-          {title}
-        </h2>
-        <p className="mt-1 text-sm text-slate-500">{description}</p>
-      </div>
-
-      <a
-        href={href}
-        className="inline-flex items-center gap-1 self-start text-sm font-semibold text-[#252B68] hover:text-[#F58220]"
-      >
-        {linkText}
-        <ChevronRight size={16} />
-      </a>
-    </div>
-  );
-}
+/*
+|--------------------------------------------------------------------------
+| Page
+|--------------------------------------------------------------------------
+*/
 
 export default function AdminDashboardPage() {
-  const [mounted, setMounted] = useState(false);
+  const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
 
-  const [stats, setStats] = useState<DashboardStats>({
-    stories: 0,
-    publishedStories: 0,
-    draftStories: 0,
-    events: 0,
-    upcomingEvents: 0,
-    galleries: 0,
-  });
+  const loadDashboard = useCallback(async (opts: { silent?: boolean } = {}) => {
+    if (!opts.silent) setLoading(true);
+    else setRefreshing(true);
 
-  const [recentStories, setRecentStories] = useState<Story[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<EventItem[]>([]);
-  const [adminName, setAdminName] = useState("Administrator");
+    setError("");
 
-  const loadDashboard = useCallback(
-    async (showRefresh = false) => {
-      try {
-        if (showRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
+    try {
+      const response = await fetch(`${API_URL}/api/admin/dashboard`, {
+        headers: authHeaders(),
+        cache: "no-store",
+      });
 
-        const token = localStorage.getItem("admin_token");
+      const payload = await response.json();
 
-        if (!token) {
-          window.location.href = "/admin/login";
-          return;
-        }
-
-        const response = await fetch(
-          `${API_URL}/api/admin/dashboard`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-            cache: "no-store",
-          }
+      if (!response.ok) {
+        throw new Error(
+          payload?.message || "Unable to load the dashboard."
         );
-
-        if (response.status === 401 || response.status === 403) {
-          localStorage.removeItem("admin_token");
-          localStorage.removeItem("admin_user");
-          window.location.href = "/admin/login";
-          return;
-        }
-
-        if (!response.ok) {
-          throw new Error(
-            `Dashboard request failed: ${response.status}`
-          );
-        }
-
-        const responseData: DashboardResponse = await response.json();
-
-        const dashboardData = responseData?.data ?? {};
-
-        /*
-         * Your current Laravel API returns:
-         *
-         * data.stories.total
-         * data.stories.published
-         * data.stories.drafts
-         *
-         * data.events.total
-         * data.events.published
-         * data.events.upcoming
-         *
-         * data.gallery.total
-         * data.gallery.published
-         *
-         * The fallback below also supports the older stats format.
-         */
-
-        const storyStats = dashboardData.stories ?? {};
-        const eventStats = dashboardData.events ?? {};
-        const galleryStats = dashboardData.gallery ?? {};
-        const legacyStats = dashboardData.stats ?? {};
-
-        setStats({
-          stories: Number(
-            storyStats.total ??
-              legacyStats.stories ??
-              0
-          ),
-
-          publishedStories: Number(
-            storyStats.published ??
-              legacyStats.published_stories ??
-              0
-          ),
-
-          draftStories: Number(
-            storyStats.drafts ??
-              legacyStats.draft_stories ??
-              0
-          ),
-
-          events: Number(
-            eventStats.total ??
-              legacyStats.events ??
-              0
-          ),
-
-          upcomingEvents: Number(
-            eventStats.upcoming ??
-              legacyStats.upcoming_events ??
-              0
-          ),
-
-          galleries: Number(
-            galleryStats.total ??
-              legacyStats.galleries ??
-              legacyStats.gallery_albums ??
-              0
-          ),
-        });
-
-        const stories = Array.isArray(dashboardData.recent_stories)
-          ? dashboardData.recent_stories
-          : [];
-
-        const events = Array.isArray(dashboardData.upcoming_events)
-          ? dashboardData.upcoming_events
-          : [];
-
-        setRecentStories(stories);
-        setUpcomingEvents(events);
-      } catch (error) {
-        console.error("Dashboard loading error:", error);
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
       }
-    },
-    []
-  );
+
+      setData(payload.data as DashboardData);
+    } catch (e: any) {
+      setError(e?.message || "Unable to load the dashboard.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    setMounted(true);
-
-    const storedUser = localStorage.getItem("admin_user");
-
-    if (storedUser) {
-      try {
-        const user = JSON.parse(storedUser);
-
-        if (user?.name) {
-          setAdminName(user.name);
-        }
-      } catch {
-        // Ignore malformed local storage data.
-      }
-    }
-
     loadDashboard();
   }, [loadDashboard]);
 
-  if (!mounted || loading) {
-    return <DashboardLoading />;
-  }
-
   return (
-    <main className="min-h-screen bg-[#f6f7fb]">
-      <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
-        {/* Hero */}
-        <section className="relative overflow-hidden rounded-3xl bg-[#252B68] px-6 py-7 shadow-xl sm:px-8 sm:py-9">
-          <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-[#FFE900]/10" />
-          <div className="absolute -bottom-32 right-24 h-64 w-64 rounded-full bg-[#F58220]/10" />
-          <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-white/[0.04] to-transparent" />
+    <div className="space-y-6">
+      {/* Page Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[#172033]">
+            Dashboard
+          </h1>
 
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="max-w-2xl">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/90 backdrop-blur">
-                <Sparkles size={14} className="text-[#FFE900]" />
-                Mount View Administration
-              </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Welcome back. Here is what is happening at Mount View.
+          </p>
+        </div>
 
-              <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
-                {getGreeting()}, {adminName.split(" ")[0]}
-              </h1>
-
-              <p className="mt-3 max-w-xl text-sm leading-6 text-white/70 sm:text-base">
-                Manage your school website, stories, events and gallery
-                content from one central dashboard.
-              </p>
-
-              <div className="mt-6 flex flex-wrap gap-3">
-                <a
-                  href="/admin/stories"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#FFE900] px-4 py-2.5 text-sm font-bold text-[#252B68] shadow-sm transition hover:bg-white"
-                >
-                  <Plus size={17} />
-                  New Story
-                </a>
-
-                <a
-                  href="/admin/events"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/15"
-                >
-                  <CalendarDays size={17} />
-                  Add Event
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 self-start lg:self-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-lg font-bold text-white ring-1 ring-white/10">
-                {getInitials(adminName)}
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-white">
-                  {adminName}
-                </p>
-                <p className="mt-0.5 text-xs text-white/60">
-                  Website Administrator
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => loadDashboard(true)}
-                disabled={refreshing}
-                className="ml-2 flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition hover:bg-white/15 disabled:opacity-50"
-                title="Refresh dashboard"
-              >
-                <RefreshCw
-                  size={17}
-                  className={refreshing ? "animate-spin" : ""}
-                />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Statistics */}
-        <section className="mt-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-[#172033]">
-                Website overview
-              </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                A quick look at your current website content.
-              </p>
-            </div>
-
-            <div className="hidden items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-slate-500 shadow-sm ring-1 ring-slate-200 sm:flex">
-              <Activity size={14} className="text-emerald-500" />
-              System active
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard
-              title="Stories"
-              value={stats.stories}
-              subtitle={`${stats.publishedStories} published · ${stats.draftStories} drafts`}
-              icon={BookOpen}
-              iconClass="bg-[#252B68]/10 text-[#252B68]"
-              href="/admin/stories"
-            />
-
-            <StatCard
-              title="Events"
-              value={stats.events}
-              subtitle={`${stats.upcomingEvents} upcoming`}
-              icon={CalendarDays}
-              iconClass="bg-[#F58220]/10 text-[#F58220]"
-              href="/admin/events"
-            />
-
-            <StatCard
-              title="Gallery albums"
-              value={stats.galleries}
-              subtitle="Published school albums"
-              icon={GalleryHorizontalEnd}
-              iconClass="bg-[#FFE900]/20 text-[#8a7800]"
-              href="/admin/gallery"
-            />
-
-            <StatCard
-              title="Published stories"
-              value={stats.publishedStories}
-              subtitle="Visible on the website"
-              icon={Eye}
-              iconClass="bg-emerald-50 text-emerald-600"
-              href="/admin/stories"
-            />
-
-            <StatCard
-              title="Draft stories"
-              value={stats.draftStories}
-              subtitle="Waiting to be published"
-              icon={FileText}
-              iconClass="bg-amber-50 text-amber-600"
-              href="/admin/stories"
-            />
-
-            <StatCard
-              title="Upcoming events"
-              value={stats.upcomingEvents}
-              subtitle="Future school activities"
-              icon={Clock3}
-              iconClass="bg-sky-50 text-sky-600"
-              href="/admin/events"
-            />
-          </div>
-        </section>
-
-        {/* Quick actions */}
-        <section className="mt-7">
-          <SectionHeader
-            title="Quick actions"
-            description="Common tasks for managing the school website."
-            href="/admin"
-            linkText=""
+        <button
+          type="button"
+          onClick={() => loadDashboard({ silent: true })}
+          disabled={refreshing}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+        >
+          <RefreshCw
+            size={17}
+            className={refreshing ? "animate-spin" : ""}
           />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+      </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <a
-              href="/admin/stories"
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68]/10 text-[#252B68]">
-                <Plus size={19} />
-              </div>
+      {/* Error */}
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800">
+          <AlertCircle size={20} className="mt-0.5 shrink-0" />
+          <p className="text-sm font-medium">{error}</p>
+        </div>
+      )}
 
-              <p className="mt-3 text-sm font-bold text-[#172033]">
-                New story
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Publish news
-              </p>
-
-              <ArrowRight
-                size={15}
-                className="mt-3 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#252B68]"
-              />
-            </a>
-
-            <a
-              href="/admin/events"
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F58220]/10 text-[#F58220]">
-                <CalendarDays size={19} />
-              </div>
-
-              <p className="mt-3 text-sm font-bold text-[#172033]">
-                New event
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Add activity
-              </p>
-
-              <ArrowRight
-                size={15}
-                className="mt-3 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#F58220]"
-              />
-            </a>
-
-            <a
-              href="/admin/gallery"
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFE900]/25 text-[#8a7800]">
-                <Upload size={19} />
-              </div>
-
-              <p className="mt-3 text-sm font-bold text-[#172033]">
-                Add gallery
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Upload photos
-              </p>
-
-              <ArrowRight
-                size={15}
-                className="mt-3 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#8a7800]"
-              />
-            </a>
-
-            <a
-              href="/admin/media"
-              className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                <ImageIcon size={19} />
-              </div>
-
-              <p className="mt-3 text-sm font-bold text-[#172033]">
-                Media library
-              </p>
-
-              <p className="mt-1 text-xs text-slate-500">
-                Manage files
-              </p>
-
-              <ArrowRight
-                size={15}
-                className="mt-3 text-slate-300 transition group-hover:translate-x-1 group-hover:text-slate-600"
-              />
-            </a>
-          </div>
-        </section>
-
-        {/* Content area */}
-        <div className="mt-7 grid grid-cols-1 gap-6 xl:grid-cols-5">
-          {/* Recent stories */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-3">
-            <SectionHeader
-              title="Recent stories"
-              description="Latest news and updates from the school."
-              href="/admin/stories"
+      {/* Loading */}
+      {loading && !data && (
+        <div className="flex min-h-[400px] items-center justify-center rounded-2xl border border-slate-200 bg-white">
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <Loader2
+              size={20}
+              className="animate-spin text-[#F58220]"
             />
+            Loading dashboard…
+          </div>
+        </div>
+      )}
 
-            {recentStories.length > 0 ? (
-              <div className="divide-y divide-slate-100">
-                {recentStories.slice(0, 5).map((story) => (
-                  <a
-                    key={story.id}
-                    href={`/admin/stories`}
-                    className="group flex gap-4 py-4 first:pt-1 last:pb-1"
-                  >
-                    <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                      {story.image_url ? (
-                        <img
-                          src={story.image_url}
-                          alt=""
-                          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-slate-300">
-                          <BookOpen size={22} />
+      {/* Content */}
+      {data && (
+        <>
+          {/* Website stats */}
+          <section>
+            <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">
+              Website Overview
+            </h2>
+
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard
+                label="Total Stories"
+                value={data.stats.stories}
+                sublabel={`${data.stats.published_stories} published`}
+                icon={<BookOpen size={22} />}
+                accent="text-[#252B68]"
+                bg="bg-[#252B68]/10"
+                href="/admin/stories"
+              />
+              <StatCard
+                label="Events"
+                value={data.stats.events}
+                sublabel={`${data.stats.upcoming_events} upcoming`}
+                icon={<CalendarDays size={22} />}
+                accent="text-[#F58220]"
+                bg="bg-[#F58220]/10"
+                href="/admin/events"
+              />
+              <StatCard
+                label="Gallery Albums"
+                value={data.stats.galleries}
+                sublabel="Image collections"
+                icon={<GalleryHorizontalEnd size={22} />}
+                accent="text-emerald-600"
+                bg="bg-emerald-50"
+                href="/admin/gallery"
+              />
+              <StatCard
+                label="Users"
+                value={data.stats.users}
+                sublabel={`${data.stats.active_users} active`}
+                icon={<Users size={22} />}
+                accent="text-violet-600"
+                bg="bg-violet-50"
+                href="/admin/users"
+              />
+            </div>
+          </section>
+
+          {/* Admissions pipeline */}
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Admissions Pipeline
+              </h2>
+
+              <Link
+                href="/admin/admissions"
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#252B68] hover:underline"
+              >
+                View all
+                <ChevronRight size={14} />
+              </Link>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#252B68]/10 text-[#252B68]">
+                  <ClipboardCheck size={22} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                    Total Applications
+                  </p>
+
+                  <p className="text-2xl font-black text-[#252B68]">
+                    {data.admissions.total}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <PipelineCell
+                  label="Submitted"
+                  value={data.admissions.submitted}
+                  tone="blue"
+                />
+                <PipelineCell
+                  label="Documents"
+                  value={data.admissions.document_verification}
+                  tone="amber"
+                />
+                <PipelineCell
+                  label="Assessments"
+                  value={
+                    data.admissions.assessments_scheduled +
+                    data.admissions.assessments_completed
+                  }
+                  tone="violet"
+                />
+                <PipelineCell
+                  label="Awaiting Approval"
+                  value={data.admissions.awaiting_approval}
+                  tone="orange"
+                />
+                <PipelineCell
+                  label="Enrolled"
+                  value={data.admissions.enrolled}
+                  tone="emerald"
+                />
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+                <MiniStat
+                  label="Approved"
+                  value={data.admissions.approved}
+                  className="text-green-600"
+                />
+                <MiniStat
+                  label="Waitlisted"
+                  value={data.admissions.waitlisted}
+                  className="text-purple-600"
+                />
+                <MiniStat
+                  label="Denied"
+                  value={data.admissions.denied}
+                  className="text-red-600"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Recent applications + Recent users */}
+          <section className="grid gap-6 lg:grid-cols-2">
+            <Panel
+              title="Recent Applications"
+              icon={<FileText size={17} />}
+              href="/admin/admissions"
+              hrefLabel="View all"
+            >
+              {data.recent_applications.length === 0 ? (
+                <EmptyState
+                  icon={<FileText size={22} />}
+                  title="No applications yet"
+                  subtitle="New applications will appear here as they come in."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.recent_applications.map((application) => (
+                    <li key={application.id}>
+                      <Link
+                        href={`/admin/admissions?application=${application.id}`}
+                        className="flex items-center gap-3 py-3 transition hover:bg-slate-50/50"
+                      >
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#252B68] text-sm font-bold text-white">
+                          {application.legal_first_name?.[0] ?? "?"}
+                          {application.legal_surname?.[0] ?? ""}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {story.category?.name && (
-                          <span className="rounded-full bg-[#252B68]/8 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-[#252B68]">
-                            {story.category.name}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-[#172033]">
+                            {fullName(application)}
+                          </p>
+
+                          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            <span className="font-mono">
+                              {application.application_number}
+                            </span>
+                            {application.class_applied && (
+                              <>
+                                <span>·</span>
+                                <span>
+                                  {application.class_applied.name}
+                                </span>
+                              </>
+                            )}
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                            STATUS_COLORS[application.status] ??
+                            "bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {statusLabel(application.status)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel
+              title="Recent Users"
+              icon={<Users size={17} />}
+              href="/admin/users"
+              hrefLabel="Manage users"
+            >
+              {data.recent_users.length === 0 ? (
+                <EmptyState
+                  icon={<Users size={22} />}
+                  title="No users yet"
+                  subtitle="Created accounts will appear here."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.recent_users.map((user) => (
+                    <li
+                      key={user.id}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-[#252B68]">
+                        {user.name
+                          ?.split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((part) => part[0])
+                          .join("")
+                          .toUpperCase() || "U"}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-[#172033]">
+                          {user.name}
+                        </p>
+
+                        <p className="truncate text-xs text-slate-500">
+                          {user.email}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="rounded-full bg-[#252B68]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#252B68]">
+                          {roleLabel(user.role)}
+                        </span>
+
+                        {user.is_active ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            Active
                           </span>
-                        )}
-
-                        {story.status && (
-                          <span
-                            className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                              story.status === "published"
-                                ? "bg-emerald-50 text-emerald-600"
-                                : "bg-amber-50 text-amber-600"
-                            }`}
-                          >
-                            {story.status}
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            Pending
                           </span>
                         )}
                       </div>
-
-                      <h3 className="mt-2 line-clamp-1 text-sm font-bold text-[#172033] group-hover:text-[#252B68]">
-                        {story.title}
-                      </h3>
-
-                      <p className="mt-1 text-xs text-slate-400">
-                        {formatDate(
-                          story.published_at ?? story.created_at
-                        )}
-                      </p>
-                    </div>
-
-                    <ChevronRight
-                      size={17}
-                      className="mt-5 shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#252B68]"
-                    />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-48 flex-col items-center justify-center rounded-xl bg-slate-50 text-center">
-                <BookOpen size={30} className="text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-slate-600">
-                  No recent stories
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Published stories will appear here.
-                </p>
-              </div>
-            )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
           </section>
 
-          {/* Upcoming events */}
-          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm xl:col-span-2">
-            <SectionHeader
-              title="Upcoming events"
-              description="What is coming up at Mount View."
+          {/* Recent stories + Upcoming events */}
+          <section className="grid gap-6 lg:grid-cols-2">
+            <Panel
+              title="Recent Stories"
+              icon={<BookOpen size={17} />}
+              href="/admin/stories"
+              hrefLabel="All stories"
+            >
+              {data.recent_stories.length === 0 ? (
+                <EmptyState
+                  icon={<BookOpen size={22} />}
+                  title="No stories yet"
+                  subtitle="Published and draft stories will appear here."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.recent_stories.map((story) => (
+                    <li key={story.id}>
+                      <Link
+                        href={`/admin/stories/${story.id}`}
+                        className="flex items-center gap-3 py-3 transition hover:bg-slate-50/50"
+                      >
+                        <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                          {story.image_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={story.image_url}
+                              alt={story.title}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-slate-400">
+                              <ImageIcon size={18} />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-[#172033]">
+                            {story.title}
+                          </p>
+
+                          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            {story.category && (
+                              <span>{story.category.name}</span>
+                            )}
+                            {story.category && <span>·</span>}
+                            <span>{formatRelative(story.created_at)}</span>
+                          </p>
+                        </div>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                            story.status === "published"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-amber-50 text-amber-700"
+                          }`}
+                        >
+                          {story.status}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
+
+            <Panel
+              title="Upcoming Events"
+              icon={<CalendarDays size={17} />}
               href="/admin/events"
-            />
+              hrefLabel="All events"
+            >
+              {data.upcoming_events.length === 0 ? (
+                <EmptyState
+                  icon={<Calendar size={22} />}
+                  title="No upcoming events"
+                  subtitle="Scheduled events will appear here."
+                />
+              ) : (
+                <ul className="divide-y divide-slate-100">
+                  {data.upcoming_events.map((event) => (
+                    <li key={event.id}>
+                      <Link
+                        href={`/admin/events/${event.id}`}
+                        className="flex items-center gap-3 py-3 transition hover:bg-slate-50/50"
+                      >
+                        <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-[#F58220]/10 text-[#F58220]">
+                          <span className="text-[10px] font-bold uppercase leading-none">
+                            {new Date(event.event_date).toLocaleString(
+                              undefined,
+                              { month: "short" }
+                            )}
+                          </span>
 
-            {upcomingEvents.length > 0 ? (
-              <div className="space-y-3">
-                {upcomingEvents.slice(0, 5).map((event) => (
-                  <a
-                    key={event.id}
-                    href="/admin/events"
-                    className="group flex gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-[#252B68]/15 hover:bg-slate-50"
-                  >
-                    <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-[#252B68] text-white">
-                      <CalendarDays size={16} />
-                      <span className="mt-0.5 text-[9px] font-bold uppercase">
-                        Event
-                      </span>
-                    </div>
+                          <span className="text-base font-black leading-none">
+                            {new Date(event.event_date).getDate()}
+                          </span>
+                        </div>
 
-                    <div className="min-w-0 flex-1">
-                      <h3 className="line-clamp-1 text-sm font-bold text-[#172033] group-hover:text-[#252B68]">
-                        {event.title}
-                      </h3>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-[#172033]">
+                            {event.title}
+                          </p>
 
-                      <p className="mt-1 text-xs font-medium text-[#F58220]">
-                        {formatEventDate(event.event_date)}
-                      </p>
+                          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                            {event.start_time && (
+                              <span className="inline-flex items-center gap-1">
+                                <Clock size={11} />
+                                {event.start_time}
+                              </span>
+                            )}
 
-                      {(event.start_time || event.location) && (
-                        <p className="mt-1 line-clamp-1 text-xs text-slate-400">
-                          {event.start_time
-                            ? formatTime(event.start_time)
-                            : ""}
-                          {event.start_time && event.location
-                            ? " · "
-                            : ""}
-                          {event.location ?? ""}
-                        </p>
-                      )}
-                    </div>
+                            {event.location && (
+                              <span className="inline-flex items-center gap-1">
+                                <MapPin size={11} />
+                                {event.location}
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                    <ChevronRight
-                      size={16}
-                      className="mt-3 shrink-0 text-slate-300 transition group-hover:translate-x-1 group-hover:text-[#F58220]"
-                    />
-                  </a>
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-48 flex-col items-center justify-center rounded-xl bg-slate-50 text-center">
-                <CalendarDays size={30} className="text-slate-300" />
-                <p className="mt-3 text-sm font-semibold text-slate-600">
-                  No upcoming events
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Add a new event to keep the school community informed.
-                </p>
-              </div>
-            )}
+                        <ChevronRight
+                          size={16}
+                          className="shrink-0 text-slate-300"
+                        />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Panel>
           </section>
+
+          {/* School website shortcut */}
+          <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-[#252B68] to-[#171B4A] p-6 text-white shadow-sm">
+            <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFE900]/10 text-[#FFE900]">
+                  <GraduationCap size={24} />
+                </div>
+
+                <div>
+                  <p className="text-base font-bold">
+                    Mount View International Primary School
+                  </p>
+
+                  <p className="mt-0.5 text-sm text-white/70">
+                    View the public website to see live content.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/"
+                target="_blank"
+                className="inline-flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+              >
+                Open website
+                <ArrowUpRight size={16} />
+              </Link>
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| Sub-components
+|--------------------------------------------------------------------------
+*/
+
+function StatCard({
+  label,
+  value,
+  sublabel,
+  icon,
+  accent,
+  bg,
+  href,
+}: {
+  label: string;
+  value: number;
+  sublabel?: string;
+  icon: React.ReactNode;
+  accent: string;
+  bg: string;
+  href?: string;
+}) {
+  const content = (
+    <div className="flex h-full items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-[#252B68]/30 hover:shadow-md">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          {label}
+        </p>
+
+        <p className="mt-2 text-3xl font-black text-[#172033]">{value}</p>
+
+        {sublabel && (
+          <p className="mt-1 text-xs text-slate-500">{sublabel}</p>
+        )}
+      </div>
+
+      <div
+        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${bg} ${accent}`}
+      >
+        {icon}
+      </div>
+    </div>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="block h-full">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
+}
+
+function PipelineCell({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "blue" | "amber" | "violet" | "orange" | "emerald";
+}) {
+  const tones = {
+    blue: "bg-blue-50 text-blue-700",
+    amber: "bg-amber-50 text-amber-700",
+    violet: "bg-violet-50 text-violet-700",
+    orange: "bg-orange-50 text-orange-700",
+    emerald: "bg-emerald-50 text-emerald-700",
+  };
+
+  return (
+    <div className={`rounded-xl p-3 ${tones[tone]}`}>
+      <p className="text-[10px] font-bold uppercase tracking-wider opacity-70">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xl font-black">{value}</p>
+    </div>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: number;
+  className?: string;
+}) {
+  return (
+    <div className="text-center">
+      <p className={`text-lg font-black ${className ?? "text-[#172033]"}`}>
+        {value}
+      </p>
+
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  icon,
+  href,
+  hrefLabel,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  href: string;
+  hrefLabel: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div className="flex items-center gap-2">
+          <span className="text-[#252B68]">{icon}</span>
+
+          <h3 className="text-sm font-bold text-[#172033]">{title}</h3>
         </div>
 
-        {/* Bottom information */}
-        <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68]/10 text-[#252B68]">
-                <TrendingUp size={19} />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-[#172033]">
-                  Content activity
-                </p>
-                <p className="text-xs text-slate-400">
-                  Keep the website fresh
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
-              <div
-                className="h-full rounded-full bg-[#252B68]"
-                style={{
-                  width: `${Math.min(
-                    Math.max(stats.publishedStories * 10, 10),
-                    100
-                  )}%`,
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F58220]/10 text-[#F58220]">
-                <FolderOpen size={19} />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-[#172033]">
-                  School gallery
-                </p>
-                <p className="text-xs text-slate-400">
-                  {stats.galleries} published album
-                  {stats.galleries === 1 ? "" : "s"}
-                </p>
-              </div>
-            </div>
-
-            <a
-              href="/admin/gallery"
-              className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#252B68] hover:text-[#F58220]"
-            >
-              Manage gallery
-              <ArrowRight size={13} />
-            </a>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFE900]/30 text-[#756500]">
-                <Users size={19} />
-              </div>
-
-              <div>
-                <p className="text-sm font-bold text-[#172033]">
-                  Administration
-                </p>
-                <p className="text-xs text-slate-400">
-                  Manage website access
-                </p>
-              </div>
-            </div>
-
-            <a
-              href="/admin/users"
-              className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-[#252B68] hover:text-[#F58220]"
-            >
-              Manage users
-              <ArrowRight size={13} />
-            </a>
-          </div>
-        </section>
-
-        {/* Footer */}
-        <footer className="mt-8 border-t border-slate-200 py-5 text-center">
-          <p className="text-xs text-slate-400">
-            Mount View International Primary School & Early Years Centre
-          </p>
-          <p className="mt-1 text-[11px] text-slate-300">
-            Fostering growth, excellence and empathy
-          </p>
-        </footer>
+        <Link
+          href={href}
+          className="inline-flex items-center gap-1 text-xs font-bold text-[#252B68] hover:underline"
+        >
+          {hrefLabel}
+          <ChevronRight size={14} />
+        </Link>
       </div>
-    </main>
+
+      <div className="px-5 py-2">{children}</div>
+    </div>
+  );
+}
+
+function EmptyState({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+        {icon}
+      </div>
+
+      <p className="mt-3 text-sm font-semibold text-[#172033]">{title}</p>
+
+      <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
+    </div>
   );
 }

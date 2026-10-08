@@ -1,6 +1,112 @@
 import Link from "next/link";
 import ImageWithFallback from "../components/ImageWithFallback";
 
+/* =========================================================
+   API / BACKEND HELPERS
+========================================================= */
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
+type Story = {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content?: string | null;
+  image_url: string | null;
+  category: { id: number; name: string; slug: string } | null;
+  published_at: string | null;
+  created_at: string | null;
+};
+
+type EventItem = {
+  id: number;
+  title: string;
+  slug: string;
+  description: string | null;
+  image_url: string | null;
+  event_date: string;
+  start_time: string | null;
+  end_time: string | null;
+  location: string | null;
+  class_name: string | null;
+};
+
+type GalleryImage = {
+  id: number;
+  image_url: string | null;
+  sort_order: number;
+};
+
+type GalleryItem = {
+  id: number;
+  title: string;
+  slug: string;
+  description: string | null;
+  cover_image: string | null;
+  image_count: number;
+  event_date: string | null;
+  images: GalleryImage[];
+};
+
+async function fetchJson<T>(path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_URL}${path}`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function getLatestStories(limit = 3): Promise<Story[]> {
+  const res = await fetchJson<{ data: { data: Story[] } }>(
+    `/api/stories?per_page=${limit}`
+  );
+  return res?.data?.data ?? [];
+}
+
+async function getUpcomingEvents(limit = 3): Promise<EventItem[]> {
+  const res = await fetchJson<{ data: { data: EventItem[] } }>(
+    `/api/events?per_page=${limit}`
+  );
+  return res?.data?.data ?? [];
+}
+
+async function getLatestGalleries(limit = 2): Promise<GalleryItem[]> {
+  const res = await fetchJson<{ data: { data: GalleryItem[] } }>(
+    `/api/gallery?per_page=${limit}`
+  );
+  return res?.data?.data ?? [];
+}
+
+function resolveImageUrl(url: string | null | undefined): string {
+  if (!url) return "";
+  if (/^https?:\/\//i.test(url)) return url;
+  const trimmed = url.startsWith("/") ? url : `/${url}`;
+  return `${API_URL}${trimmed}`;
+}
+
+function formatEventDate(value: string | null | undefined): string {
+  if (!value) return "";
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return value;
+  }
+}
+
+/* =========================================================
+   STATIC BRAND CONTENT
+========================================================= */
+
 const highlights = [
   {
     number: "01",
@@ -117,15 +223,51 @@ const journey = [
   },
 ];
 
-export default function Home() {
+/* =========================================================
+   PAGE
+========================================================= */
+
+export default async function Home() {
+  const [stories, events, galleries] = await Promise.all([
+    getLatestStories(3),
+    getUpcomingEvents(3),
+    getLatestGalleries(2),
+  ]);
+
+  const featuredStory = stories[0] ?? null;
+  const secondaryStory = stories[1] ?? null;
+  const featuredEvent = events[0] ?? null;
+
+  const featuredGallery = galleries[0] ?? null;
+  const heroGallery = galleries[1] ?? galleries[0] ?? null;
+
+  const galleryPreviewImages = (featuredGallery?.images ?? [])
+    .slice(0, 5)
+    .map((img) => ({
+      id: img.id,
+      url: resolveImageUrl(img.image_url),
+    }))
+    .filter((img) => img.url);
+
+  const heroImage =
+    resolveImageUrl(heroGallery?.cover_image) || "/images/school-life.jpg";
+
+  const schoolLifeImage =
+    resolveImageUrl(featuredGallery?.cover_image) || "/images/sports.JPG";
+
+  const hasNews =
+    Boolean(featuredStory) ||
+    Boolean(featuredEvent) ||
+    Boolean(featuredGallery);
+
   return (
     <main className="bg-white text-[#172033]">
       {/* =========================================================
           HERO
       ========================================================== */}
       <section className="relative overflow-hidden bg-[#252B68]">
-        <div className="absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[#FFE900]/10" />
-        <div className="absolute -bottom-48 -left-40 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/10" />
+        <div className="pointer-events-none absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[#FFE900]/10" />
+        <div className="pointer-events-none absolute -bottom-48 -left-40 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/10" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-24">
           {/* HERO TEXT */}
@@ -185,42 +327,119 @@ export default function Home() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">1</p>
+                <p className="text-2xl font-black text-[#FFE900]">2</p>
                 <p className="mt-1 text-xs font-semibold text-blue-100">
-                  Vibrant Community
+                  Learning Stages
                 </p>
               </div>
             </div>
           </div>
 
-          {/* HERO IMAGE */}
+          {/* ============================================================
+              HERO IMAGE — ADVERTISING STYLE
+              • Outer wrapper is `relative isolate` so children get a
+                fresh stacking context and nothing is pushed behind.
+              • Image sits at the base with no competing stacking context.
+              • Every text/badge layer uses an explicit z-10 / z-20.
+              • Ribbons float on the RIGHT edge (or outer edges) so they
+                never cover the hero text on the left on desktop.
+          ============================================================ */}
           <div className="order-1 lg:order-2">
-            <div className="relative">
-              <div className="absolute -inset-3 rounded-[2.5rem] bg-[#FFE900]/10 blur-xl" />
+            <div className="relative isolate">
+              {/* Glow behind the frame */}
+              <div className="pointer-events-none absolute -inset-3 z-0 rounded-[2.5rem] bg-[#FFE900]/15 blur-2xl" />
 
-              {/* Clean image — no overlays covering the photograph */}
-              <div className="relative overflow-hidden rounded-[2rem] border-8 border-white/10 bg-white/10 shadow-2xl">
-                <ImageWithFallback
-                  src="/images/school-life.jpg"
-                  alt="Learners enjoying school life at Mount View International Primary School"
-                  className="aspect-[4/3] w-full"
-                />
+              {/* Advertising frame */}
+              <div className="relative z-10 overflow-hidden rounded-[2rem] border-[10px] border-white/10 bg-[#171B4A] shadow-2xl ring-1 ring-white/10">
+                <div className="relative">
+                  {/* Base image */}
+                  <ImageWithFallback
+                    src={heroImage}
+                    alt="Learners enjoying school life at Mount View International Primary School"
+                    className="aspect-[4/5] w-full sm:aspect-[4/3]"
+                  />
+
+                  {/* Gradient overlay — always in front of the image */}
+                  <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/55 to-transparent" />
+
+                  {/* Top-left badge */}
+                  <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#F58220]" />
+                    Now accepting applications
+                  </div>
+
+                  {/* Top-right badge */}
+                  <div className="absolute right-4 top-4 z-20 rounded-full border border-white/25 bg-black/35 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white backdrop-blur-md">
+                    Since 1975
+                  </div>
+
+                  {/* Bottom advertising panel */}
+                  <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
+                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFE900]">
+                        Mount View International
+                      </p>
+
+                      <p className="mt-1.5 text-lg font-black leading-snug text-white sm:text-xl">
+                        Primary School & Early Years Centre
+                      </p>
+
+                      <p className="mt-2 text-sm leading-6 text-white/85">
+                        A vibrant community of 600+ learners from Malawi and
+                        around the world — growing, discovering and thriving
+                        together.
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Link
+                          href="/admissions"
+                          className="inline-flex items-center gap-2 rounded-full bg-[#F58220] px-4 py-2 text-xs font-black text-white transition hover:bg-[#d96e12]"
+                        >
+                          Apply Now
+                          <span>→</span>
+                        </Link>
+
+                        <Link
+                          href="/about"
+                          className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-xs font-black text-white transition hover:bg-white hover:text-[#252B68]"
+                        >
+                          Why Mount View
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              {/* Small caption below the image */}
-              <div className="relative mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/10 px-5 py-4 backdrop-blur-sm">
+              {/* ===================================================
+                  Floating promo ribbon — pinned to the RIGHT edge,
+                  only on large screens so it never overlaps the hero
+                  text on the left.
+              ==================================================== */}
+              <div className="absolute -right-3 top-1/3 z-20 hidden -translate-y-1/2 rotate-[6deg] rounded-xl bg-[#F58220] px-4 py-3 shadow-2xl lg:block">
+                <p className="text-[10px] font-black uppercase tracking-widest text-white/85">
+                  Enrolling
+                </p>
+                <p className="text-sm font-black text-white">
+                  Early Years → Year 6
+                </p>
+              </div>
+
+              {/* ===================================================
+                  Trust badge — bottom-right, well below the ribbon.
+              ==================================================== */}
+              <div className="absolute -bottom-5 -right-3 z-20 hidden items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl lg:flex">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68] text-lg text-[#FFE900]">
+                  ♡
+                </div>
                 <div>
-                  <p className="text-xs font-black uppercase tracking-wider text-[#FFE900]">
-                    Mount View
+                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+                    Our values
                   </p>
-                  <p className="mt-1 text-sm font-semibold text-white">
-                    Learning, growing and belonging together.
+                  <p className="text-xs font-black text-[#252B68]">
+                    Growth · Excellence · Empathy
                   </p>
                 </div>
-
-                <span className="hidden h-10 w-10 items-center justify-center rounded-full bg-[#F58220] text-lg font-black text-white sm:flex">
-                  →
-                </span>
               </div>
             </div>
           </div>
@@ -340,18 +559,20 @@ export default function Home() {
                 key={item.number}
                 className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-xl"
               >
-                <ImageWithFallback
-                  src={item.image}
-                  alt={item.title}
-                  className="aspect-[16/10] w-full"
-                />
-
-                <div className="p-7">
-                  <span className="text-sm font-black text-[#F58220]">
+                <div className="relative isolate">
+                  <ImageWithFallback
+                    src={item.image}
+                    alt={item.title}
+                    className="aspect-[16/10] w-full"
+                  />
+                  <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+                  <span className="absolute left-4 top-4 z-20 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-md">
                     {item.number}
                   </span>
+                </div>
 
-                  <h3 className="mt-3 text-2xl font-black text-[#252B68]">
+                <div className="p-7">
+                  <h3 className="text-2xl font-black text-[#252B68]">
                     {item.title}
                   </h3>
 
@@ -380,7 +601,7 @@ export default function Home() {
       ========================================================== */}
       <section className="bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
-          <div className="relative">
+          <div className="relative isolate">
             <div className="overflow-hidden rounded-[2rem] shadow-2xl">
               <ImageWithFallback
                 src="/images/creative-arts.jpg"
@@ -389,7 +610,8 @@ export default function Home() {
               />
             </div>
 
-            <div className="absolute -bottom-6 -right-3 rounded-2xl bg-[#FFE900] px-5 py-4 shadow-xl sm:-right-7">
+            {/* Values badge — z-20 so it's always in front of the image */}
+            <div className="absolute -bottom-6 -right-3 z-20 rounded-2xl bg-[#FFE900] px-5 py-4 shadow-2xl sm:-right-7">
               <p className="text-xs font-black uppercase tracking-wider text-[#252B68]">
                 Our values
               </p>
@@ -552,7 +774,7 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="relative">
+            <div className="relative isolate">
               <div className="overflow-hidden rounded-[2rem] shadow-2xl">
                 <ImageWithFallback
                   src="/images/ict.JPG"
@@ -561,7 +783,8 @@ export default function Home() {
                 />
               </div>
 
-              <div className="absolute -bottom-6 -left-4 max-w-xs rounded-2xl bg-[#F58220] p-5 text-white shadow-xl sm:-left-8">
+              {/* Floating CTA badge — z-20 keeps it in front of the image */}
+              <div className="absolute -bottom-6 -left-4 z-20 max-w-xs rounded-2xl bg-[#F58220] p-5 text-white shadow-2xl sm:-left-8">
                 <p className="text-xs font-black uppercase tracking-wider text-white/75">
                   Learning by doing
                 </p>
@@ -633,9 +856,9 @@ export default function Home() {
       <section className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid overflow-hidden rounded-[2rem] bg-[#FFE900] lg:grid-cols-2">
-            <div className="min-h-[320px]">
+            <div className="relative min-h-[320px]">
               <ImageWithFallback
-                src="/images/sports.JPG"
+                src={schoolLifeImage}
                 alt="Learners taking part in school activities"
                 className="h-full min-h-[320px] w-full"
               />
@@ -690,114 +913,247 @@ export default function Home() {
       </section>
 
       {/* =========================================================
-          NEWS / COMMUNITY
+          GALLERY PREVIEW
       ========================================================== */}
-      <section className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
-                Life at Mount View
-              </p>
+      {galleryPreviewImages.length > 0 && (
+        <section className="bg-slate-50 py-20 sm:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+                  Gallery
+                </p>
 
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
-                See what is happening in our community.
-              </h2>
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+                  {featuredGallery?.title ||
+                    "Moments from around the school."}
+                </h2>
+
+                {featuredGallery?.description && (
+                  <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                    {featuredGallery.description}
+                  </p>
+                )}
+              </div>
+
+              <Link
+                href="/gallery"
+                className="font-black text-[#252B68] transition hover:text-[#F58220]"
+              >
+                View full gallery →
+              </Link>
             </div>
 
-            <Link
-              href="/news"
-              className="font-black text-[#252B68] transition hover:text-[#F58220]"
-            >
-              View all news →
-            </Link>
+            <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Link
+                href={
+                  featuredGallery
+                    ? `/gallery/${featuredGallery.slug}`
+                    : "/gallery"
+                }
+                className="group relative isolate col-span-2 row-span-2 overflow-hidden rounded-3xl"
+              >
+                <ImageWithFallback
+                  src={galleryPreviewImages[0].url}
+                  alt={featuredGallery?.title || "Gallery image"}
+                  className="aspect-square h-full w-full"
+                />
+                <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                <div className="absolute bottom-4 left-4 right-4 z-20 translate-y-2 opacity-0 transition group-hover:translate-y-0 group-hover:opacity-100">
+                  <p className="text-sm font-black text-white">
+                    {featuredGallery?.title || "Explore the gallery"}
+                  </p>
+                </div>
+              </Link>
+
+              {galleryPreviewImages.slice(1, 5).map((img, index) => (
+                <Link
+                  key={img.id}
+                  href={
+                    featuredGallery
+                      ? `/gallery/${featuredGallery.slug}`
+                      : "/gallery"
+                  }
+                  className="group relative isolate overflow-hidden rounded-3xl"
+                >
+                  <ImageWithFallback
+                    src={img.url}
+                    alt={`Gallery image ${index + 2}`}
+                    className="aspect-square h-full w-full"
+                  />
+                  <div className="pointer-events-none absolute inset-0 z-10 bg-black/0 transition group-hover:bg-black/30" />
+                </Link>
+              ))}
+            </div>
           </div>
+        </section>
+      )}
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            <Link
-              href="/news"
-              className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <ImageWithFallback
-                src="/images/creative-arts.jpg"
-                alt="Mount View school event"
-                className="aspect-[16/10] w-full"
-              />
-
-              <div className="p-6">
-                <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
-                  School Events
+      {/* =========================================================
+          NEWS / COMMUNITY
+      ========================================================== */}
+      {hasNews && (
+        <section className="bg-white py-20 sm:py-24">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+                  Life at Mount View
                 </p>
 
-                <h3 className="mt-2 text-xl font-black text-[#252B68]">
-                  Celebrating learning, teamwork and school spirit.
-                </h3>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Discover stories and updates from our school community.
-                </p>
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+                  See what is happening in our community.
+                </h2>
               </div>
-            </Link>
 
-            <Link
-              href="/news"
-              className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <ImageWithFallback
-                src="/images/steam-learning.jpg"
-                alt="Learners taking part in STEAM learning"
-                className="aspect-[16/10] w-full"
-              />
+              <Link
+                href="/news"
+                className="font-black text-[#252B68] transition hover:text-[#F58220]"
+              >
+                View all news →
+              </Link>
+            </div>
 
-              <div className="p-6">
-                <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
-                  Learning
-                </p>
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {featuredStory && (
+                <Link
+                  href={`/news/${featuredStory.slug}`}
+                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <ImageWithFallback
+                    src={
+                      resolveImageUrl(featuredStory.image_url) ||
+                      "/images/creative-arts.jpg"
+                    }
+                    alt={featuredStory.title}
+                    className="aspect-[16/10] w-full"
+                  />
 
-                <h3 className="mt-2 text-xl font-black text-[#252B68]">
-                  Learning through exploration and creativity.
-                </h3>
+                  <div className="p-6">
+                    <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
+                      {featuredStory.category?.name || "Latest News"}
+                    </p>
 
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  See how learning experiences extend beyond the classroom.
-                </p>
-              </div>
-            </Link>
+                    <h3 className="mt-2 line-clamp-2 text-xl font-black text-[#252B68]">
+                      {featuredStory.title}
+                    </h3>
 
-            <Link
-              href="/gallery"
-              className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
-            >
-              <ImageWithFallback
-                src="/images/school-life.jpg"
-                alt="Life and learning at Mount View"
-                className="aspect-[16/10] w-full"
-              />
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                      {featuredStory.excerpt ||
+                        "Read the full story from our school community."}
+                    </p>
+                  </div>
+                </Link>
+              )}
 
-              <div className="p-6">
-                <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
-                  School Life
-                </p>
+              {featuredEvent && (
+                <Link
+                  href={`/events/${featuredEvent.slug}`}
+                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <ImageWithFallback
+                    src={
+                      resolveImageUrl(featuredEvent.image_url) ||
+                      "/images/steam-learning.jpg"
+                    }
+                    alt={featuredEvent.title}
+                    className="aspect-[16/10] w-full"
+                  />
 
-                <h3 className="mt-2 text-xl font-black text-[#252B68]">
-                  Experience the Mount View community.
-                </h3>
+                  <div className="p-6">
+                    <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
+                      Upcoming Event
+                    </p>
 
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Explore photographs and moments from school life.
-                </p>
-              </div>
-            </Link>
+                    <h3 className="mt-2 line-clamp-2 text-xl font-black text-[#252B68]">
+                      {featuredEvent.title}
+                    </h3>
+
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                      {formatEventDate(featuredEvent.event_date)}
+                      {featuredEvent.start_time
+                        ? ` · ${featuredEvent.start_time}`
+                        : ""}
+                      {featuredEvent.location
+                        ? ` · ${featuredEvent.location}`
+                        : ""}
+                    </p>
+                  </div>
+                </Link>
+              )}
+
+              {featuredGallery && (
+                <Link
+                  href={`/gallery/${featuredGallery.slug}`}
+                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <ImageWithFallback
+                    src={
+                      resolveImageUrl(featuredGallery.cover_image) ||
+                      "/images/school-life.jpg"
+                    }
+                    alt={featuredGallery.title}
+                    className="aspect-[16/10] w-full"
+                  />
+
+                  <div className="p-6">
+                    <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
+                      Gallery
+                    </p>
+
+                    <h3 className="mt-2 line-clamp-2 text-xl font-black text-[#252B68]">
+                      {featuredGallery.title}
+                    </h3>
+
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                      {featuredGallery.description ||
+                        `Explore ${featuredGallery.image_count} photos from our school.`}
+                    </p>
+                  </div>
+                </Link>
+              )}
+
+              {!featuredGallery && secondaryStory && (
+                <Link
+                  href={`/news/${secondaryStory.slug}`}
+                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <ImageWithFallback
+                    src={
+                      resolveImageUrl(secondaryStory.image_url) ||
+                      "/images/school-life.jpg"
+                    }
+                    alt={secondaryStory.title}
+                    className="aspect-[16/10] w-full"
+                  />
+
+                  <div className="p-6">
+                    <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
+                      More News
+                    </p>
+
+                    <h3 className="mt-2 line-clamp-2 text-xl font-black text-[#252B68]">
+                      {secondaryStory.title}
+                    </h3>
+
+                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
+                      {secondaryStory.excerpt ||
+                        "Catch up with what our learners have been doing."}
+                    </p>
+                  </div>
+                </Link>
+              )}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* =========================================================
           ADMISSIONS CTA
       ========================================================== */}
       <section className="relative overflow-hidden bg-[#252B68] py-20 sm:py-24">
-        <div className="absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F58220]/10" />
-        <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-[#FFE900]/10" />
+        <div className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F58220]/10" />
+        <div className="pointer-events-none absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-[#FFE900]/10" />
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
@@ -950,8 +1306,8 @@ export default function Home() {
           FINAL CTA
       ========================================================== */}
       <section className="relative overflow-hidden bg-[#F58220]">
-        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
-        <div className="absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-[#252B68]/10" />
+        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
+        <div className="pointer-events-none absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-[#252B68]/10" />
 
         <div className="relative mx-auto max-w-7xl px-4 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
           <p className="text-sm font-black uppercase tracking-[0.22em] text-white/80">

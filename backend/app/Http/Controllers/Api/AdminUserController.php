@@ -8,13 +8,26 @@ use App\Notifications\AdminSetPasswordNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Throwable;
 
 class AdminUserController extends Controller
 {
+    /**
+     * Every role the admin portal is allowed to assign.
+     *
+     * Keep this list in sync with the frontend ROLE_OPTIONS constant
+     * and with the AdminMiddleware / AdmissionRoleMiddleware role lists.
+     */
+    protected array $assignableRoles = [
+        'administrator',
+        'editor',
+        'staff',
+        'headteacher',
+        'admissions_officer',
+    ];
+
     /**
      * List users.
      */
@@ -67,11 +80,7 @@ class AdminUserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
-            'role' => ['required', Rule::in([
-                'administrator',
-                'editor',
-                'staff',
-            ])],
+            'role' => ['required', 'string', Rule::in($this->assignableRoles)],
         ]);
 
         return $this->createUserAndSendActivation($validated);
@@ -86,11 +95,7 @@ class AdminUserController extends Controller
             'users' => ['required', 'array', 'min:1', 'max:100'],
             'users.*.name' => ['required', 'string', 'max:255'],
             'users.*.email' => ['required', 'email', 'max:255'],
-            'users.*.role' => ['required', Rule::in([
-                'administrator',
-                'editor',
-                'staff',
-            ])],
+            'users.*.role' => ['required', 'string', Rule::in($this->assignableRoles)],
         ]);
 
         $users = $request->input('users');
@@ -315,11 +320,7 @@ class AdminUserController extends Controller
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),
             ],
-            'role' => ['required', Rule::in([
-                'administrator',
-                'editor',
-                'staff',
-            ])],
+            'role' => ['required', 'string', Rule::in($this->assignableRoles)],
             'is_active' => ['required', 'boolean'],
         ]);
 
