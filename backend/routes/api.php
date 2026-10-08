@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\PublicAdmissionController;
 use App\Http\Controllers\Api\AdminAdmissionController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\NewsletterSubscriberController;
+use App\Http\Controllers\Api\ContactMessageController;
 
 /*
 |--------------------------------------------------------------------------
@@ -38,7 +39,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC WEBSITE
+| PUBLIC WEBSITE — STORIES / EVENTS / GALLERY
 |--------------------------------------------------------------------------
 */
 
@@ -65,11 +66,28 @@ Route::get('/newsletters/{slug}/download', [NewsletterController::class, 'downlo
 |--------------------------------------------------------------------------
 | PUBLIC NEWSLETTER SUBSCRIBERS
 |--------------------------------------------------------------------------
-| Anybody can subscribe, and the unsubscribe link in emails is public.
+| Anyone can subscribe. The unsubscribe link is public (no login) and is
+| what the frontend unsubscribe page calls on mount.
 */
 
-Route::post('/newsletter-subscribers', [NewsletterSubscriberController::class, 'store']);
-Route::get('/newsletter-subscribers/unsubscribe/{token}', [NewsletterSubscriberController::class, 'unsubscribe']);
+Route::post(
+    '/newsletter-subscribers',
+    [NewsletterSubscriberController::class, 'store']
+);
+
+Route::get(
+    '/newsletter-subscribers/unsubscribe/{token}',
+    [NewsletterSubscriberController::class, 'unsubscribe']
+);
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC CONTACT FORM
+|--------------------------------------------------------------------------
+| Anybody can submit a contact enquiry — no login required.
+*/
+
+Route::post('/contact-messages', [ContactMessageController::class, 'store']);
 
 /*
 |--------------------------------------------------------------------------
@@ -77,38 +95,75 @@ Route::get('/newsletter-subscribers/unsubscribe/{token}', [NewsletterSubscriberC
 |--------------------------------------------------------------------------
 */
 
-Route::post('/admissions/applications', [PublicAdmissionController::class, 'start']);
-Route::post('/admissions/applications/resend-credentials', [PublicAdmissionController::class, 'resendCredentials']);
-Route::post('/admissions/applications/{applicationNumber}/track', [PublicAdmissionController::class, 'show']);
-Route::post('/admissions/applications/{applicationNumber}/save', [PublicAdmissionController::class, 'save']);
-Route::post('/admissions/applications/{applicationNumber}/photo', [PublicAdmissionController::class, 'uploadPhoto']);
-Route::get('/admissions/applications/{applicationNumber}/photo', [PublicAdmissionController::class, 'showPhoto']);
-Route::post('/admissions/applications/{applicationNumber}/documents', [PublicAdmissionController::class, 'uploadDocument']);
-Route::post('/admissions/applications/{applicationNumber}/submit', [PublicAdmissionController::class, 'submit']);
+Route::post(
+    '/admissions/applications',
+    [PublicAdmissionController::class, 'start']
+);
+
+Route::post(
+    '/admissions/applications/resend-credentials',
+    [PublicAdmissionController::class, 'resendCredentials']
+);
+
+Route::post(
+    '/admissions/applications/{applicationNumber}/track',
+    [PublicAdmissionController::class, 'show']
+);
+
+Route::post(
+    '/admissions/applications/{applicationNumber}/save',
+    [PublicAdmissionController::class, 'save']
+);
+
+Route::post(
+    '/admissions/applications/{applicationNumber}/photo',
+    [PublicAdmissionController::class, 'uploadPhoto']
+);
+
+Route::get(
+    '/admissions/applications/{applicationNumber}/photo',
+    [PublicAdmissionController::class, 'showPhoto']
+);
+
+Route::post(
+    '/admissions/applications/{applicationNumber}/documents',
+    [PublicAdmissionController::class, 'uploadDocument']
+);
+
+Route::post(
+    '/admissions/applications/{applicationNumber}/submit',
+    [PublicAdmissionController::class, 'submit']
+);
 
 /*
 |--------------------------------------------------------------------------
 | GENERAL ADMIN PORTAL
 |--------------------------------------------------------------------------
+| CMS roles: administrator, editor, staff, admissions_officer, headteacher.
+| Enforced by the `admin` middleware alias.
 */
 
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
 
+    /* ---------------- Categories ---------------- */
     Route::get('/admin/categories', [CategoryController::class, 'index']);
     Route::post('/admin/categories', [CategoryController::class, 'store']);
 
+    /* ---------------- Stories ---------------- */
     Route::get('/admin/stories', [StoryController::class, 'index']);
     Route::post('/admin/stories', [StoryController::class, 'store']);
     Route::get('/admin/stories/{story}', [StoryController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/admin/stories/{story}', [StoryController::class, 'update']);
     Route::delete('/admin/stories/{story}', [StoryController::class, 'destroy']);
 
+    /* ---------------- Events ---------------- */
     Route::get('/admin/events', [EventController::class, 'index']);
     Route::post('/admin/events', [EventController::class, 'store']);
     Route::get('/admin/events/{event}', [EventController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/admin/events/{event}', [EventController::class, 'update']);
     Route::delete('/admin/events/{event}', [EventController::class, 'destroy']);
 
+    /* ---------------- Gallery ---------------- */
     Route::get('/admin/gallery', [GalleryController::class, 'index']);
     Route::post('/admin/gallery', [GalleryController::class, 'store']);
     Route::get('/admin/gallery/{gallery}', [GalleryController::class, 'show']);
@@ -118,38 +173,39 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     Route::delete('/admin/gallery-images/{galleryImage}', [GalleryImageController::class, 'destroy']);
     Route::post('/admin/gallery-images/reorder', [GalleryImageController::class, 'reorder']);
 
+    /* ---------------- Profile ---------------- */
     Route::get('/admin/profile', [AdminProfileController::class, 'show']);
     Route::put('/admin/profile', [AdminProfileController::class, 'update']);
     Route::post('/admin/profile/password', [AdminProfileController::class, 'changePassword']);
 
+    /* ---------------- Dashboard ---------------- */
     Route::get('/admin/dashboard', [DashboardController::class, 'index']);
 
-    /*
-    |----------------------------------------------------------------------
-    | ADMIN — NEWSLETTERS
-    |----------------------------------------------------------------------
-    */
-
+    /* ---------------- Newsletters (admin) ---------------- */
     Route::get('/admin/newsletters', [NewsletterController::class, 'index']);
     Route::post('/admin/newsletters', [NewsletterController::class, 'store']);
     Route::get('/admin/newsletters/{newsletter}', [NewsletterController::class, 'show']);
     Route::match(['put', 'patch'], '/admin/newsletters/{newsletter}', [NewsletterController::class, 'update']);
     Route::delete('/admin/newsletters/{newsletter}', [NewsletterController::class, 'destroy']);
 
-    /*
-    |----------------------------------------------------------------------
-    | ADMIN — NEWSLETTER SUBSCRIBERS
-    |----------------------------------------------------------------------
-    */
-
+    /* ---------------- Newsletter Subscribers (admin) ---------------- */
     Route::get('/admin/newsletter-subscribers', [NewsletterSubscriberController::class, 'index']);
     Route::delete('/admin/newsletter-subscribers/{subscriber}', [NewsletterSubscriberController::class, 'destroy']);
+
+    /* ---------------- Contact Messages (admin inbox) ---------------- */
+    Route::get('/admin/contact-messages', [ContactMessageController::class, 'index']);
+    Route::get('/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'show']);
+    Route::match(['put', 'patch'], '/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'update']);
+    Route::post('/admin/contact-messages/{contactMessage}/reply', [ContactMessageController::class, 'reply']);
+    Route::delete('/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
 });
 
 /*
 |--------------------------------------------------------------------------
 | PRINTABLE APPLICATION (PUBLIC WITH QUERY-TOKEN)
 |--------------------------------------------------------------------------
+| Declared BEFORE the auth group so Laravel matches it first. Auth is
+| validated inside the controller using the ?token= query parameter.
 */
 
 Route::get(
@@ -161,6 +217,7 @@ Route::get(
 |--------------------------------------------------------------------------
 | ADMISSIONS ADMIN MODULE
 |--------------------------------------------------------------------------
+| Roles: admissions_officer, principal, headteacher
 */
 
 Route::middleware([
@@ -168,17 +225,23 @@ Route::middleware([
     'admission.role:admissions_officer,principal,headteacher',
 ])->prefix('admin/admissions')->group(function () {
 
+    /* Dashboard */
     Route::get('/dashboard', [AdminAdmissionController::class, 'dashboard']);
+
+    /* Form options (classes / academic years / houses) */
     Route::get('/form-options', [AdminAdmissionController::class, 'formOptions']);
 
+    /* Notifications */
     Route::get('/notifications', [AdminAdmissionController::class, 'notifications']);
     Route::post('/notifications/read-all', [AdminAdmissionController::class, 'markAllNotificationsRead']);
     Route::post('/notifications/{id}/read', [AdminAdmissionController::class, 'markNotificationRead']);
 
+    /* List + create applications */
     Route::get('/', [AdminAdmissionController::class, 'index']);
     Route::get('/applications', [AdminAdmissionController::class, 'index']);
     Route::post('/applications', [AdminAdmissionController::class, 'store']);
 
+    /* View + update single application */
     Route::get('/applications/{application}', [AdminAdmissionController::class, 'show']);
     Route::match(
         ['put', 'patch'],
@@ -186,6 +249,7 @@ Route::middleware([
         [AdminAdmissionController::class, 'update']
     );
 
+    /* Documents */
     Route::get(
         '/applications/{application}/documents/{document}/preview',
         [AdminAdmissionController::class, 'previewDocument']
@@ -199,6 +263,7 @@ Route::middleware([
         [AdminAdmissionController::class, 'verifyDocument']
     );
 
+    /* Assessments */
     Route::post(
         '/applications/{application}/assessments',
         [AdminAdmissionController::class, 'scheduleAssessment']
@@ -208,11 +273,13 @@ Route::middleware([
         [AdminAdmissionController::class, 'completeAssessment']
     );
 
+    /* Enrol */
     Route::post(
         '/applications/{application}/enrol',
         [AdminAdmissionController::class, 'enrol']
     );
 
+    /* Comments */
     Route::post(
         '/applications/{application}/comments',
         [AdminAdmissionController::class, 'storeComment']
@@ -227,6 +294,7 @@ Route::middleware([
         [AdminAdmissionController::class, 'destroyComment']
     );
 
+    /* Decisions */
     Route::match(
         ['put', 'patch'],
         '/applications/{application}/decisions/{decision}',
@@ -264,6 +332,7 @@ Route::middleware([
     'auth:sanctum',
     'administrator',
 ])->group(function () {
+
     Route::get('/admin/users', [AdminUserController::class, 'index']);
     Route::post('/admin/users', [AdminUserController::class, 'store']);
     Route::post('/admin/users/bulk', [AdminUserController::class, 'bulkStore']);

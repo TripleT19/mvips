@@ -2,16 +2,118 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 const mapUrl =
   "https://www.google.com/maps/place/Mount+View+International+Primary+School+and+Early+Years+Centre/@-15.7960625,35.0714375,17z/data=!3m1!4b1!4m6!3m5!1s0x18d84f17f3d82731:0x1efcb27554b97db7!8m2!3d-15.7960625!4d35.0714375!16s%2Fg%2F11g6mh83zg?entry=ttu&g_ep=EgoyMDI2MDkyMy4wIKXMDSoASAFQAw%3D%3D";
 
-export default function ContactPage() {
-  const [submitted, setSubmitted] = useState(false);
+const ENQUIRY_OPTIONS = [
+  { value: "admissions", label: "Admissions" },
+  { value: "school-information", label: "School Information" },
+  { value: "curriculum", label: "Curriculum & Learning" },
+  { value: "school-life", label: "School Life" },
+  { value: "general", label: "General Enquiry" },
+];
 
-  function handleSubmit(event) {
+export default function ContactPage() {
+  const [status, setStatus] = useState("idle"); // idle | submitting | success | error
+  const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    enquiry_type: "",
+    child_name: "",
+    class_name: "",
+    message: "",
+  });
+
+  function update(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }
+
+  async function handleSubmit(event) {
     event.preventDefault();
-    setSubmitted(true);
+    if (status === "submitting") return;
+
+    setStatus("submitting");
+    setErrorMessage("");
+    setFieldErrors({});
+
+    try {
+      const response = await fetch(`${API_URL}/api/contact-messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          full_name: form.full_name.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim() || null,
+          enquiry_type: form.enquiry_type,
+          child_name: form.child_name.trim() || null,
+          class_name: form.class_name.trim() || null,
+          message: form.message.trim(),
+        }),
+      });
+
+      const json = await response.json();
+
+      if (!response.ok) {
+        if (json && json.errors) {
+          const flat = {};
+          for (const key of Object.keys(json.errors)) {
+            const value = json.errors[key];
+            flat[key] = Array.isArray(value) ? String(value[0]) : String(value);
+          }
+          setFieldErrors(flat);
+          setErrorMessage(
+            json.message || "Please correct the highlighted fields."
+          );
+        } else {
+          setErrorMessage(
+            (json && json.message) ||
+              "Something went wrong. Please try again."
+          );
+        }
+        setStatus("error");
+        return;
+      }
+
+      setStatus("success");
+      setForm({
+        full_name: "",
+        email: "",
+        phone: "",
+        enquiry_type: "",
+        child_name: "",
+        class_name: "",
+        message: "",
+      });
+    } catch (err) {
+      setStatus("error");
+      setErrorMessage(
+        "We couldn't send your message. Please check your connection and try again."
+      );
+    }
+  }
+
+  function resetForm() {
+    setStatus("idle");
+    setErrorMessage("");
+    setFieldErrors({});
   }
 
   return (
@@ -20,8 +122,8 @@ export default function ContactPage() {
           HERO
       ========================================================= */}
       <section className="relative overflow-hidden bg-[#252B68]">
-        <div className="absolute -right-32 -top-32 h-80 w-80 rounded-full bg-[#FFE900]/10" />
-        <div className="absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-[#F58220]/10" />
+        <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full bg-[#FFE900]/10" />
+        <div className="pointer-events-none absolute -bottom-40 -left-24 h-96 w-96 rounded-full bg-[#F58220]/10" />
 
         <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="max-w-3xl">
@@ -31,9 +133,7 @@ export default function ContactPage() {
 
             <h1 className="text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
               We would love to
-              <span className="block text-[#FFE900]">
-                hear from you.
-              </span>
+              <span className="block text-[#FFE900]">hear from you.</span>
             </h1>
 
             <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
@@ -50,7 +150,6 @@ export default function ContactPage() {
       ========================================================= */}
       <section className="relative z-10 -mt-8 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-3">
-          {/* PHONE */}
           <a
             href="tel:+265881668001"
             className="group rounded-3xl bg-white p-7 shadow-xl ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-2xl"
@@ -59,20 +158,15 @@ export default function ContactPage() {
               📞
             </div>
 
-            <h2 className="mt-5 text-xl font-bold text-[#252B68]">
-              Call Us
-            </h2>
+            <h2 className="mt-5 text-xl font-bold text-[#252B68]">Call Us</h2>
 
             <p className="mt-2 leading-7 text-slate-600">
               Speak with our team for admissions and general enquiries.
             </p>
 
-            <p className="mt-2 font-semibold text-[#F58220]">
-              0881 668 001
-            </p>
+            <p className="mt-2 font-semibold text-[#F58220]">0881 668 001</p>
           </a>
 
-          {/* EMAIL */}
           <a
             href="mailto:info@mountviewmw.com"
             className="group rounded-3xl bg-white p-7 shadow-xl ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-2xl"
@@ -81,9 +175,7 @@ export default function ContactPage() {
               ✉️
             </div>
 
-            <h2 className="mt-5 text-xl font-bold text-[#252B68]">
-              Email Us
-            </h2>
+            <h2 className="mt-5 text-xl font-bold text-[#252B68]">Email Us</h2>
 
             <p className="mt-2 leading-7 text-slate-600">
               Send us your questions and our team will get back to you.
@@ -94,7 +186,6 @@ export default function ContactPage() {
             </p>
           </a>
 
-          {/* LOCATION */}
           <a
             href={mapUrl}
             target="_blank"
@@ -105,12 +196,10 @@ export default function ContactPage() {
               📍
             </div>
 
-            <h2 className="mt-5 text-xl font-bold text-[#252B68]">
-              Find Us
-            </h2>
+            <h2 className="mt-5 text-xl font-bold text-[#252B68]">Find Us</h2>
 
             <p className="mt-2 leading-7 text-slate-600">
-              Visit Mount View International Primary School & Early Years
+              Visit Mount View International Primary School &amp; Early Years
               Centre.
             </p>
 
@@ -214,9 +303,7 @@ export default function ContactPage() {
                   className="flex items-center gap-3 break-all text-[#252B68] transition hover:text-[#F58220]"
                 >
                   <span className="text-xl">✉️</span>
-                  <span className="font-semibold">
-                    info@mountviewmw.com
-                  </span>
+                  <span className="font-semibold">info@mountviewmw.com</span>
                 </a>
 
                 <a
@@ -228,7 +315,7 @@ export default function ContactPage() {
                   <span className="text-xl">📍</span>
 
                   <span className="font-semibold">
-                    Mount View International Primary School & Early Years
+                    Mount View International Primary School &amp; Early Years
                     Centre
                     <br />
                     Blantyre, Malawi
@@ -240,7 +327,7 @@ export default function ContactPage() {
 
           {/* FORM */}
           <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-xl sm:p-8 lg:p-10">
-            {!submitted ? (
+            {status !== "success" ? (
               <>
                 <div className="mb-8">
                   <h2 className="text-2xl font-black text-[#252B68] sm:text-3xl">
@@ -252,24 +339,43 @@ export default function ContactPage() {
                   </p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-6">
+                {status === "error" && errorMessage && (
+                  <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>{errorMessage}</p>
+                  </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                   {/* FULL NAME */}
                   <div>
                     <label
                       htmlFor="fullName"
                       className="mb-2 block text-sm font-bold text-[#252B68]"
                     >
-                      Full Name
+                      Full Name *
                     </label>
 
                     <input
                       id="fullName"
-                      name="fullName"
                       type="text"
                       required
+                      value={form.full_name}
+                      onChange={(e) => update("full_name", e.target.value)}
                       placeholder="Enter your full name"
-                      className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
+                      className={`w-full rounded-xl border px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+                        fieldErrors.full_name
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-slate-300 focus:border-[#252B68] focus:ring-[#252B68]/10"
+                      }`}
                     />
+
+                    {fieldErrors.full_name && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
+                        <AlertCircle size={12} />
+                        {fieldErrors.full_name}
+                      </p>
+                    )}
                   </div>
 
                   {/* EMAIL + PHONE */}
@@ -279,17 +385,29 @@ export default function ContactPage() {
                         htmlFor="email"
                         className="mb-2 block text-sm font-bold text-[#252B68]"
                       >
-                        Email Address
+                        Email Address *
                       </label>
 
                       <input
                         id="email"
-                        name="email"
                         type="email"
                         required
+                        value={form.email}
+                        onChange={(e) => update("email", e.target.value)}
                         placeholder="you@example.com"
-                        className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
+                        className={`w-full rounded-xl border px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+                          fieldErrors.email
+                            ? "border-red-400 focus:border-red-500 focus:ring-red-500/10"
+                            : "border-slate-300 focus:border-[#252B68] focus:ring-[#252B68]/10"
+                        }`}
                       />
+
+                      {fieldErrors.email && (
+                        <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
+                          <AlertCircle size={12} />
+                          {fieldErrors.email}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -302,8 +420,9 @@ export default function ContactPage() {
 
                       <input
                         id="phone"
-                        name="phone"
                         type="tel"
+                        value={form.phone}
+                        onChange={(e) => update("phone", e.target.value)}
                         placeholder="0881 668 001"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                       />
@@ -316,40 +435,37 @@ export default function ContactPage() {
                       htmlFor="enquiryType"
                       className="mb-2 block text-sm font-bold text-[#252B68]"
                     >
-                      Enquiry Type
+                      Enquiry Type *
                     </label>
 
                     <select
                       id="enquiryType"
-                      name="enquiryType"
                       required
-                      defaultValue=""
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-800 outline-none transition focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
+                      value={form.enquiry_type}
+                      onChange={(e) => update("enquiry_type", e.target.value)}
+                      className={`w-full rounded-xl border bg-white px-4 py-3.5 text-slate-800 outline-none transition focus:ring-2 ${
+                        fieldErrors.enquiry_type
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-slate-300 focus:border-[#252B68] focus:ring-[#252B68]/10"
+                      }`}
                     >
                       <option value="" disabled>
                         Select an enquiry type
                       </option>
 
-                      <option value="admissions">
-                        Admissions
-                      </option>
-
-                      <option value="school-information">
-                        School Information
-                      </option>
-
-                      <option value="curriculum">
-                        Curriculum & Learning
-                      </option>
-
-                      <option value="school-life">
-                        School Life
-                      </option>
-
-                      <option value="general">
-                        General Enquiry
-                      </option>
+                      {ENQUIRY_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
+
+                    {fieldErrors.enquiry_type && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
+                        <AlertCircle size={12} />
+                        {fieldErrors.enquiry_type}
+                      </p>
+                    )}
                   </div>
 
                   {/* CHILD NAME + CLASS */}
@@ -359,7 +475,7 @@ export default function ContactPage() {
                         htmlFor="childName"
                         className="mb-2 block text-sm font-bold text-[#252B68]"
                       >
-                        Child's Name
+                        Child&apos;s Name
                         <span className="ml-1 font-normal text-slate-400">
                           (optional)
                         </span>
@@ -367,8 +483,9 @@ export default function ContactPage() {
 
                       <input
                         id="childName"
-                        name="childName"
                         type="text"
+                        value={form.child_name}
+                        onChange={(e) => update("child_name", e.target.value)}
                         placeholder="Child's name"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                       />
@@ -387,8 +504,9 @@ export default function ContactPage() {
 
                       <input
                         id="className"
-                        name="className"
                         type="text"
+                        value={form.class_name}
+                        onChange={(e) => update("class_name", e.target.value)}
                         placeholder="e.g. Year 5 East"
                         className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
                       />
@@ -401,38 +519,58 @@ export default function ContactPage() {
                       htmlFor="message"
                       className="mb-2 block text-sm font-bold text-[#252B68]"
                     >
-                      Message
+                      Message *
                     </label>
 
                     <textarea
                       id="message"
-                      name="message"
                       required
                       rows={6}
+                      value={form.message}
+                      onChange={(e) => update("message", e.target.value)}
                       placeholder="How can we help you?"
-                      className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-[#252B68] focus:ring-2 focus:ring-[#252B68]/10"
+                      className={`w-full resize-none rounded-xl border px-4 py-3.5 text-slate-800 outline-none transition placeholder:text-slate-400 focus:ring-2 ${
+                        fieldErrors.message
+                          ? "border-red-400 focus:border-red-500 focus:ring-red-500/10"
+                          : "border-slate-300 focus:border-[#252B68] focus:ring-[#252B68]/10"
+                      }`}
                     />
+
+                    {fieldErrors.message && (
+                      <p className="mt-1 flex items-center gap-1 text-xs text-red-600">
+                        <AlertCircle size={12} />
+                        {fieldErrors.message}
+                      </p>
+                    )}
                   </div>
 
                   {/* SUBMIT */}
                   <button
                     type="submit"
-                    className="w-full rounded-xl bg-[#F58220] px-6 py-4 font-bold text-white transition hover:bg-[#d96e12] hover:shadow-lg"
+                    disabled={status === "submitting"}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#F58220] px-6 py-4 font-bold text-white transition hover:bg-[#d96e12] hover:shadow-lg disabled:opacity-60"
                   >
-                    Send Enquiry
+                    {status === "submitting" ? (
+                      <>
+                        <Loader2 size={18} className="animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Send Enquiry"
+                    )}
                   </button>
 
                   <p className="text-center text-xs leading-5 text-slate-500">
                     By submitting this form, you are sending an enquiry to
-                    Mount View International Primary School & Early Years
+                    Mount View International Primary School &amp; Early Years
                     Centre.
                   </p>
                 </form>
               </>
             ) : (
               <div className="flex min-h-[550px] flex-col items-center justify-center text-center">
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EAF7EE] text-4xl text-green-600">
-                  ✓
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EAF7EE] text-green-600">
+                  <CheckCircle2 size={40} />
                 </div>
 
                 <h2 className="mt-7 text-3xl font-black text-[#252B68]">
@@ -440,18 +578,27 @@ export default function ContactPage() {
                 </h2>
 
                 <p className="mt-4 max-w-md leading-7 text-slate-600">
-                  Your enquiry has been recorded. Our team will review your
-                  message and get back to you using the contact details you
-                  provided.
+                  Your enquiry has been received by our team. We&apos;ll review
+                  your message and get back to you using the contact details
+                  you provided.
                 </p>
 
-                <button
-                  type="button"
-                  onClick={() => setSubmitted(false)}
-                  className="mt-8 rounded-full bg-[#252B68] px-7 py-3 font-bold text-white transition hover:bg-[#1c2054]"
-                >
-                  Send Another Message
-                </button>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="rounded-full bg-[#252B68] px-7 py-3 font-bold text-white transition hover:bg-[#1c2054]"
+                  >
+                    Send Another Message
+                  </button>
+
+                  <Link
+                    href="/"
+                    className="rounded-full border-2 border-[#252B68]/20 px-7 py-3 font-bold text-[#252B68] transition hover:bg-[#252B68] hover:text-white"
+                  >
+                    Back to Home
+                  </Link>
+                </div>
               </div>
             )}
           </div>
@@ -473,13 +620,12 @@ export default function ContactPage() {
             </h2>
 
             <p className="mt-4 leading-7 text-slate-600">
-              Find Mount View International Primary School & Early Years
+              Find Mount View International Primary School &amp; Early Years
               Centre in Blantyre using Google Maps.
             </p>
           </div>
 
           <div className="grid overflow-hidden rounded-[2rem] bg-white shadow-xl lg:grid-cols-[1.3fr_0.7fr]">
-            {/* MAP */}
             <div className="relative min-h-[430px] bg-[#252B68]">
               <iframe
                 title="Mount View International Primary School and Early Years Centre location"
@@ -500,7 +646,6 @@ export default function ContactPage() {
               </div>
             </div>
 
-            {/* LOCATION INFO */}
             <div className="flex flex-col justify-center p-8 sm:p-10">
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-2xl">
                 📍
@@ -511,7 +656,7 @@ export default function ContactPage() {
               </h3>
 
               <p className="mt-3 leading-7 text-slate-600">
-                Mount View International Primary School & Early Years Centre
+                Mount View International Primary School &amp; Early Years Centre
                 <br />
                 Blantyre, Malawi
               </p>
@@ -579,7 +724,7 @@ export default function ContactPage() {
               <p className="mt-4 leading-7 text-slate-600">
                 You can use the enquiry form on this page or visit our
                 Admissions page for more information about beginning your
-                child's Mount View journey.
+                child&apos;s Mount View journey.
               </p>
             </details>
 
@@ -627,8 +772,8 @@ export default function ContactPage() {
       <section className="px-4 pb-20 sm:px-6 lg:px-8 lg:pb-28">
         <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-[#252B68]">
           <div className="relative px-6 py-14 text-center sm:px-12 sm:py-16">
-            <div className="absolute -left-20 -top-20 h-48 w-48 rounded-full bg-[#FFE900]/10" />
-            <div className="absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-[#F58220]/10" />
+            <div className="pointer-events-none absolute -left-20 -top-20 h-48 w-48 rounded-full bg-[#FFE900]/10" />
+            <div className="pointer-events-none absolute -bottom-24 -right-20 h-64 w-64 rounded-full bg-[#F58220]/10" />
 
             <div className="relative">
               <p className="font-bold uppercase tracking-widest text-[#FFE900]">
@@ -636,7 +781,7 @@ export default function ContactPage() {
               </p>
 
               <h2 className="mx-auto mt-3 max-w-3xl text-3xl font-black text-white sm:text-4xl">
-                Begin your child's Mount View journey.
+                Begin your child&apos;s Mount View journey.
               </h2>
 
               <p className="mx-auto mt-5 max-w-2xl leading-7 text-blue-100">
@@ -677,7 +822,7 @@ export default function ContactPage() {
           </p>
 
           <p className="mt-4 text-sm text-slate-500">
-            Mount View International Primary School & Early Years Centre
+            Mount View International Primary School &amp; Early Years Centre
           </p>
         </div>
       </section>

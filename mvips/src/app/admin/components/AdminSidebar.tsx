@@ -5,11 +5,13 @@ import {
   CalendarDays,
   ChevronRight,
   ClipboardCheck,
+  FileText,
   GalleryHorizontalEnd,
   GraduationCap,
   Images,
   LayoutDashboard,
   LogOut,
+  Mail,
   Settings,
   ShieldCheck,
   Users,
@@ -35,46 +37,107 @@ type AdminSidebarProps = {
   setMobileOpen?: (open: boolean) => void;
 };
 
+/* ------------------------------------------------------------------
+| Navigation
+------------------------------------------------------------------ */
+
 /**
  * access:
  *   "cms"        → always visible to any signed-in admin
  *   "admissions" → only when canAccessAdmissions
  *   "users"      → only when canManageUsers
+ *   "messages"   → only when canViewMessages
  */
 type NavItem = {
   label: string;
   href: string;
   icon: React.ElementType;
-  access: "cms" | "admissions" | "users";
+  access: "cms" | "admissions" | "users" | "messages";
 };
 
 const mainNavigation: NavItem[] = [
-  { label: "Dashboard", href: "/admin", icon: LayoutDashboard, access: "cms" },
-  { label: "Admissions", href: "/admin/admissions", icon: ClipboardCheck, access: "admissions" },
-  { label: "Stories & News", href: "/admin/stories", icon: BookOpen, access: "cms" },
-  { label: "Events", href: "/admin/events", icon: CalendarDays, access: "cms" },
-  { label: "Gallery", href: "/admin/gallery", icon: GalleryHorizontalEnd, access: "cms" },
-  { label: "Media Library", href: "/admin/media", icon: Images, access: "cms" },
+  {
+    label: "Dashboard",
+    href: "/admin",
+    icon: LayoutDashboard,
+    access: "cms",
+  },
+  {
+    label: "Admissions",
+    href: "/admin/admissions",
+    icon: ClipboardCheck,
+    access: "admissions",
+  },
+  {
+    label: "Contact Messages",
+    href: "/admin/contact-messages",
+    icon: Mail,
+    access: "messages",
+  },
+  {
+    label: "Newsletters",
+    href: "/admin/newsletters",
+    icon: FileText,
+    access: "cms",
+  },
+  {
+    label: "Stories & News",
+    href: "/admin/stories",
+    icon: BookOpen,
+    access: "cms",
+  },
+  {
+    label: "Events",
+    href: "/admin/events",
+    icon: CalendarDays,
+    access: "cms",
+  },
+  {
+    label: "Gallery",
+    href: "/admin/gallery",
+    icon: GalleryHorizontalEnd,
+    access: "cms",
+  },
+  {
+    label: "Media Library",
+    href: "/admin/media",
+    icon: Images,
+    access: "cms",
+  },
 ];
 
 const administrationNavigation: NavItem[] = [
-  { label: "Users", href: "/admin/users", icon: Users, access: "users" },
-  { label: "Settings", href: "/admin/settings", icon: Settings, access: "cms" },
+  {
+    label: "Users",
+    href: "/admin/users",
+    icon: Users,
+    access: "users",
+  },
+  {
+    label: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
+    access: "cms",
+  },
 ];
+
+/* ------------------------------------------------------------------
+| Permissions
+------------------------------------------------------------------ */
 
 type RolePermissions = {
   canAccessAdmissions: boolean;
   canManageUsers: boolean;
+  canViewMessages: boolean;
 };
 
 /**
  * Role → permission map:
  *
- *   administrator / admin   → CMS ✓ | Admissions ✗ | Users ✓
- *   admissions_officer      → CMS ✓ | Admissions ✓ | Users ✗
- *   headteacher / principal → CMS ✓ | Admissions ✓ | Users ✗
- *   editor / staff          → CMS ✓ | Admissions ✗ | Users ✗
- *   anything else           → CMS ✓ | Admissions ✗ | Users ✗
+ *   administrator / admin    → CMS ✓ | Admissions ✗ | Users ✓ | Messages ✓
+ *   admissions_officer       → CMS ✓ | Admissions ✓ | Users ✗ | Messages ✓
+ *   headteacher / principal  → CMS ✓ | Admissions ✓ | Users ✗ | Messages ✓
+ *   editor / staff           → CMS ✓ | Admissions ✗ | Users ✗ | Messages ✗
  */
 function getRolePermissions(role?: string | null): RolePermissions {
   const normalized = (role || "").toLowerCase().trim();
@@ -82,17 +145,29 @@ function getRolePermissions(role?: string | null): RolePermissions {
   switch (normalized) {
     case "administrator":
     case "admin":
-      return { canAccessAdmissions: false, canManageUsers: true };
+      return {
+        canAccessAdmissions: false,
+        canManageUsers: true,
+        canViewMessages: true,
+      };
 
     case "admissions_officer":
     case "headteacher":
     case "principal":
-      return { canAccessAdmissions: true, canManageUsers: false };
+      return {
+        canAccessAdmissions: true,
+        canManageUsers: false,
+        canViewMessages: true,
+      };
 
     case "editor":
     case "staff":
     default:
-      return { canAccessAdmissions: false, canManageUsers: false };
+      return {
+        canAccessAdmissions: false,
+        canManageUsers: false,
+        canViewMessages: false,
+      };
   }
 }
 
@@ -107,6 +182,10 @@ function getInitials(name?: string) {
     .join("");
 }
 
+/* ------------------------------------------------------------------
+| Sidebar
+------------------------------------------------------------------ */
+
 export default function AdminSidebar({
   mobileOpen = false,
   setMobileOpen,
@@ -119,14 +198,14 @@ export default function AdminSidebar({
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem("admin_user");
-      if (storedUser) setUser(JSON.parse(storedUser));
+      const stored = localStorage.getItem("admin_user");
+      if (stored) setUser(JSON.parse(stored));
     } catch {
       setUser(null);
     }
   }, []);
 
-  /* Scroll the currently active item into view when the mobile drawer opens. */
+  /* Scroll the active item into view when the mobile drawer opens. */
   useEffect(() => {
     if (!mobileOpen) return;
 
@@ -142,6 +221,7 @@ export default function AdminSidebar({
   const canSeeItem = (item: NavItem): boolean => {
     if (item.access === "admissions") return permissions.canAccessAdmissions;
     if (item.access === "users") return permissions.canManageUsers;
+    if (item.access === "messages") return permissions.canViewMessages;
     return true;
   };
 
@@ -158,7 +238,6 @@ export default function AdminSidebar({
 
   const handleLogout = async () => {
     if (loggingOut) return;
-
     setLoggingOut(true);
 
     try {
@@ -320,7 +399,7 @@ export default function AdminSidebar({
         </div>
       </div>
 
-      {/* User */}
+      {/* User + logout */}
       <div className="border-t border-white/10 px-3 py-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FFE900] text-xs font-extrabold text-[#252B68]">
@@ -354,7 +433,7 @@ export default function AdminSidebar({
 
   return (
     <>
-      {/* Desktop */}
+      {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] bg-[#171B4A] lg:block">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
         <div className="relative h-full overflow-y-auto overscroll-contain">
@@ -372,7 +451,7 @@ export default function AdminSidebar({
         />
       )}
 
-      {/* Mobile */}
+      {/* Mobile sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#171B4A] shadow-2xl transition-transform duration-300 lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
