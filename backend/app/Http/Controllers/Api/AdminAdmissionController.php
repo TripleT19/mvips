@@ -789,7 +789,7 @@ class AdminAdmissionController extends Controller
         $year = \App\Models\AcademicYear::findOrFail($academicYearId);
         $yearNumber = preg_replace('/[^0-9]/', '', $year->name) ?: date('Y');
         $count = Student::where('academic_year_id', $year->id)->lockForUpdate()->count() + 1;
-        $studentNumber = 'MVIS-' . $yearNumber . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+        $studentNumber = 'MVIPS-' . $yearNumber . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
 
         $student = Student::create([
             'student_number' => $studentNumber,
