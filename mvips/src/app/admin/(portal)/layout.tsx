@@ -1,6 +1,8 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import AdminSidebar from "../components/AdminSidebar";
 import AdminHeader from "../components/AdminHeader";
 
@@ -9,24 +11,80 @@ export default function AdminLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const router = useRouter();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userName, setUserName] = useState("Administrator");
   const [userRole, setUserRole] = useState("Administrator");
+  const [authChecking, setAuthChecking] = useState(true);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("admin_user");
+    let cancelled = false;
 
-    if (storedUser) {
+    async function checkAuthentication() {
+      const token = localStorage.getItem("admin_token");
+
+      if (!token) {
+        router.replace("/admin/login");
+        return;
+      }
+
       try {
-        const user = JSON.parse(storedUser);
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/admin/dashboard`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }
+        );
 
-        setUserName(user.name || "Administrator");
-        setUserRole(user.role || "Administrator");
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem("admin_token");
+          localStorage.removeItem("admin_user");
+
+          router.replace("/admin/login");
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error("Unable to verify the admin session.");
+        }
+
+        const storedUser = localStorage.getItem("admin_user");
+
+        if (storedUser) {
+          try {
+            const user = JSON.parse(storedUser);
+
+            if (!cancelled) {
+              setUserName(user.name || "Administrator");
+              setUserRole(user.role || "Administrator");
+            }
+          } catch {
+            localStorage.removeItem("admin_user");
+          }
+        }
+
+        if (!cancelled) {
+          setAuthChecking(false);
+        }
       } catch {
-        // Ignore invalid stored user.
+        if (!cancelled) {
+          router.replace("/admin/login");
+        }
       }
     }
-  }, []);
+
+    checkAuthentication();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   function handleLogout() {
     const token = localStorage.getItem("admin_token");
@@ -48,6 +106,17 @@ export default function AdminLayout({
     localStorage.removeItem("admin_user");
 
     window.location.href = "/admin/login";
+  }
+
+  if (authChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F7FB]">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#252B68]" />
+          Verifying admin session...
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -73,4 +142,3 @@ export default function AdminLayout({
     </div>
   );
 }
-

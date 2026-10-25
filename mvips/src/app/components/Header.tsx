@@ -18,7 +18,6 @@ type NavLink = {
 type NavGroup = {
   type: "group";
   name: string;
-  /** All hrefs that should mark this group as "active" */
   matchPrefixes: string[];
   items: { name: string; href: string; description?: string }[];
 };
@@ -124,11 +123,38 @@ export default function Header() {
               )
             )}
 
-            {/* CONTACT BUTTON */}
+            {/* PARENT LOGIN — secondary CTA */}
+            <Link
+              href="/parent/login"
+              aria-current={pathname === "/parent/login" ? "page" : undefined}
+              className={`ml-3 inline-flex items-center gap-1.5 rounded-full border-2 border-[#252B68] px-4 py-2 text-sm font-bold transition-all duration-200 ${
+                pathname === "/parent/login"
+                  ? "bg-[#252B68] text-white shadow-md"
+                  : "text-[#252B68] hover:bg-[#252B68] hover:text-white"
+              }`}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              Parent Login
+            </Link>
+
+            {/* CONTACT — primary CTA */}
             <Link
               href="/contact"
               aria-current={pathname === "/contact" ? "page" : undefined}
-              className={`ml-3 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-200 ${
+              className={`ml-2 rounded-full px-5 py-2.5 text-sm font-bold transition-all duration-200 ${
                 pathname === "/contact"
                   ? "bg-[#252B68] text-white shadow-md"
                   : "bg-[#F58220] text-white hover:bg-[#d96e12] hover:shadow-md"
@@ -207,10 +233,37 @@ export default function Header() {
                 )}
 
                 <Link
+                  href="/parent/login"
+                  aria-current={pathname === "/parent/login" ? "page" : undefined}
+                  onClick={() => setMenuOpen(false)}
+                  className={`mt-3 flex items-center justify-center gap-2 rounded-xl border-2 border-[#252B68] px-5 py-3.5 text-center font-bold transition ${
+                    pathname === "/parent/login"
+                      ? "bg-[#252B68] text-white"
+                      : "text-[#252B68] hover:bg-[#252B68]/5"
+                  }`}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  Parent Login
+                </Link>
+
+                <Link
                   href="/contact"
                   aria-current={pathname === "/contact" ? "page" : undefined}
                   onClick={() => setMenuOpen(false)}
-                  className={`mt-3 block rounded-xl px-5 py-3.5 text-center font-bold transition ${
+                  className={`mt-2 block rounded-xl px-5 py-3.5 text-center font-bold transition ${
                     pathname === "/contact"
                       ? "bg-[#252B68] text-white"
                       : "bg-[#F58220] text-white hover:bg-[#d96e12]"
@@ -287,7 +340,6 @@ function DesktopDropdown({
 
   const active = isGroupActive(pathname, group.matchPrefixes);
 
-  /* Close on outside click */
   useEffect(() => {
     if (!open) return;
 
@@ -311,7 +363,6 @@ function DesktopDropdown({
     };
   }, [open]);
 
-  /* Close when route changes */
   useEffect(() => {
     setOpen(false);
   }, [pathname]);

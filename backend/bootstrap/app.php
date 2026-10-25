@@ -18,6 +18,12 @@ return Application::configure(
         health: '/up',
     )
 
+    ->withMiddleware(function (Middleware $middleware) {
+        $middleware->alias([
+            'bursar.role' => \App\Http\Middleware\EnsureBursar::class,
+        ]);
+    })
+
     ->withMiddleware(function (Middleware $middleware): void {
 
         /*

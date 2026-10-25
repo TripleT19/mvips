@@ -32,4 +32,21 @@ class User extends Authenticatable
             'is_active' => 'boolean',
         ];
     }
+
+    public function teacherAssignments()
+    {
+        return $this->hasMany(TeacherAssignment::class);
+    }
+
+        public function students()
+    {
+        return $this->belongsToMany(Student::class, 'student_guardian')
+            ->withPivot(['relationship', 'is_primary'])
+            ->withTimestamps();
+    }
+
+    public function isParent(): bool
+    {
+        return in_array(strtolower((string) $this->role), ['parent', 'guardian'], true);
+    }
 }

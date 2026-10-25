@@ -9,25 +9,24 @@ use App\Models\AdmissionDecision;
 use App\Models\ApplicationDocument;
 use App\Models\Assessment;
 use App\Models\AuditLog;
+use App\Models\ClassStream;
 use App\Models\SchoolClass;
 use App\Models\Student;
 use App\Models\StudentClassHistory;
+use App\Notifications\AssessmentPassedNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class AdminAdmissionController extends Controller
 {
-    /*
-    |--------------------------------------------------------------------------
-    | LIST APPLICATIONS
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ LIST */
     public function index(Request $request)
     {
         $query = AdmissionApplication::query()
@@ -39,141 +38,116 @@ class AdminAdmissionController extends Controller
                 $q->where('application_number', 'like', "%{$search}%")
                     ->orWhere('legal_first_name', 'like', "%{$search}%")
                     ->orWhere('legal_surname', 'like', "%{$search}%")
-                    ->orWhereHas('parents', function ($p) use ($search) {
-                        $p->where('full_name', 'like', "%{$search}%")
-                            ->orWhere('phone_number', 'like', "%{$search}%");
-                    });
+                    ->orWhereHas('parents', fn ($p) => $p->where('full_name', 'like', "%{$search}%")
+                        ->orWhere('phone_number', 'like', "%{$search}%"));
             });
         }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->query('status'));
-        } else {
-            $query->whereNotIn('status', ['draft']);
-        }
-
-        if ($request->filled('physical_file_status')) {
-            $query->where('physical_file_status', $request->query('physical_file_status'));
-        }
-        if ($request->filled('academic_year_id')) {
-            $query->where('academic_year_id', $request->query('academic_year_id'));
-        }
-        if ($request->filled('class_applied_id')) {
-            $query->where('class_applied_id', $request->query('class_applied_id'));
-        }
-        if ($request->filled('source')) {
-            $query->where('source', $request->query('source'));
-        }
-
-        $perPage = min((int) $request->query('per_page', 25), 100);
+        if ($request->filled('status')) $query->where('status', $request->query('status'));
+        else $query->whereNotIn('status', ['draft']);
+        if ($request->filled('physical_file_status')) $query->where('physical_file_status', $request->query('physical_file_status'));
+        if ($request->filled('academic_year_id')) $query->where('academic_year_id', $request->query('academic_year_id'));
+        if ($request->filled('class_applied_id')) $query->where('class_applied_id', $request->query('class_applied_id'));
+        if ($request->filled('source')) $query->where('source', $request->query('source'));
 
         return response()->json([
             'success' => true,
-            'data' => $query->latest()->paginate($perPage),
+            'data' => $query->latest()->paginate(min((int) $request->query('per_page', 25), 100)),
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SHOW
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ SHOW */
     public function show(AdmissionApplication $application)
     {
         $application->load([
             'academicYear', 'classApplied', 'parents',
             'documents.verifiedBy:id,name',
             'assessments.results', 'assessments.assessor:id,name',
-            'decisions.decidedBy:id,name',
-            'decisions.approvedClass:id,name',
-            'decisions.house:id,name,colour',
-            'decisions.academicYear:id,name',
-            'termsAcceptances.termsCondition',
-            'comments.user:id,name',
-            'student.currentClass', 'student.house', 'student.academicYear',
+            'decisions.decidedBy:id,name', 'decisions.approvedClass:id,name',
+            'decisions.house:id,name,colour', 'decisions.academicYear:id,name',
+            'termsAcceptances.termsCondition', 'comments.user:id,name',
+            'student.currentClass', 'student.currentClassStream.stream',
+            'student.house', 'student.academicYear',
         ]);
 
         $this->audit('view_application', $application);
 
-        return response()->json([
-            'success' => true,
-            'data' => $application,
-        ]);
+        return response()->json(['success' => true, 'data' => $application]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FORM OPTIONS
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ FORM OPTIONS */
     public function formOptions()
     {
         return response()->json([
             'success' => true,
             'data' => [
-                'classes' => SchoolClass::query()
-                    ->where('is_active', true)
-                    ->orderBy('sort_order')
-                    ->get(['id', 'name', 'code']),
-
-                'academic_years' => \App\Models\AcademicYear::query()
-                    ->orderByDesc('name')
-                    ->get(['id', 'name', 'is_current']),
-
-                'houses' => \App\Models\House::query()
-                    ->where('is_active', true)
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'colour']),
+                'classes' => SchoolClass::where('is_active', true)->orderBy('sort_order')->get(['id', 'name', 'code']),
+                'class_streams' => ClassStream::with(['stream:id,name,code,colour', 'schoolClass:id,name'])
+                    ->where('is_active', true)->orderBy('name')
+                    ->get(['id', 'school_class_id', 'stream_id', 'name']),
+                'academic_years' => \App\Models\AcademicYear::orderByDesc('name')->get(['id', 'name', 'is_current']),
+                'houses' => \App\Models\House::where('is_active', true)->orderBy('name')->get(['id', 'name', 'colour']),
             ],
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | STORE (admin create)
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ STORE */
     public function store(Request $request)
     {
         $validated = $this->validateApplicationPayload($request);
 
-        $academicYear = null;
-        if (!empty($validated['academic_year_id'])) {
-            $academicYear = \App\Models\AcademicYear::find($validated['academic_year_id']);
-        }
+        $academicYear = !empty($validated['academic_year_id'])
+            ? \App\Models\AcademicYear::find($validated['academic_year_id'])
+            : \App\Models\AcademicYear::where('is_current', true)->first();
+
         if (!$academicYear) {
-            $academicYear = \App\Models\AcademicYear::where('is_current', true)->first();
-        }
-        if (!$academicYear) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active academic year is available.',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'No active academic year is available.'], 422);
         }
 
-        $status = $validated['status'] ?? 'draft';
+        $paperEnrol = $request->boolean('paper_enrol', false);
+        $paperData = null;
 
-        $application = DB::transaction(function () use (
-            $validated, $academicYear, $status, $request
-        ) {
+        if ($paperEnrol) {
+            $paperData = $request->validate([
+                'paper_decision' => ['required', Rule::in(['approved', 'denied', 'waitlisted'])],
+                'paper_class_stream_id' => ['nullable', 'integer', 'exists:class_streams,id'],
+                'paper_house_id' => ['nullable', 'integer', 'exists:houses,id'],
+                'paper_comments' => ['nullable', 'string'],
+                'paper_principal_comments' => ['nullable', 'string'],
+            ]);
+
+            if ($paperData['paper_decision'] === 'approved') {
+                if (empty($paperData['paper_class_stream_id'])) {
+                    throw ValidationException::withMessages([
+                        'paper_class_stream_id' => 'Select the class section the student is already in.',
+                    ]);
+                }
+                if (empty($paperData['paper_house_id'])) {
+                    throw ValidationException::withMessages([
+                        'paper_house_id' => 'Select the house the student is already in.',
+                    ]);
+                }
+
+                $stream = ClassStream::find($paperData['paper_class_stream_id']);
+                $resolvedClassId = $this->resolveClassId($validated);
+                if ($stream && $resolvedClassId && $stream->school_class_id !== $resolvedClassId) {
+                    throw ValidationException::withMessages([
+                        'paper_class_stream_id' => 'The selected section does not belong to the chosen class.',
+                    ]);
+                }
+            }
+        }
+
+        $status = $paperEnrol ? null : ($validated['status'] ?? 'draft');
+
+        [$application, $student] = DB::transaction(function () use ($validated, $academicYear, $status, $paperEnrol, $paperData) {
             $prefix = 'MVIPS-' . $academicYear->name . '-';
-            $lastApplication = AdmissionApplication::where(
-                'application_number', 'like', $prefix . '%'
-            )->orderByDesc('id')->first();
-
-            $nextNumber = $lastApplication
-                ? (int) Str::after($lastApplication->application_number, $prefix) + 1
-                : 1;
-
-            $applicationNumber = $prefix . str_pad($nextNumber, 5, '0', STR_PAD_LEFT);
-            $accessToken = Str::random(64);
+            $last = AdmissionApplication::where('application_number', 'like', $prefix . '%')
+                ->orderByDesc('id')->first();
+            $next = $last ? (int) Str::after($last->application_number, $prefix) + 1 : 1;
 
             $application = AdmissionApplication::create([
-                'application_number' => $applicationNumber,
-                'tracking_token_hash' => hash('sha256', $accessToken),
+                'application_number' => $prefix . str_pad($next, 5, '0', STR_PAD_LEFT),
+                'tracking_token_hash' => hash('sha256', Str::random(64)),
                 'contact_email' => $validated['contact_email'] ?? null,
                 'academic_year_id' => $academicYear->id,
                 'class_applied_id' => $this->resolveClassId($validated) ?? null,
@@ -204,106 +178,143 @@ class AdminAdmissionController extends Controller
                 'previous_school_address' => $validated['student']['previous_school_address'] ?? null,
                 'previous_class' => $validated['student']['previous_class'] ?? null,
                 'previous_year' => $validated['student']['previous_year'] ?? null,
-                'reason_for_leaving' => $validated['student']['reason_for_leaving'] ?? null,
                 'previous_school_contact' => $validated['student']['previous_school_contact'] ?? null,
                 'previous_school_country' => $validated['student']['previous_school_country'] ?? null,
                 'previous_school_language' => $validated['student']['previous_school_language'] ?? null,
-                'status' => $status,
+                'physical_file_status' => $validated['physical_file_status'] ?? 'pending',
+                'status' => $paperEnrol ? 'draft' : ($status ?? 'draft'),
                 'source' => $validated['source'] ?? 'paper',
-                'submitted' => $status !== 'draft',
-                'submitted_at' => $status !== 'draft' ? now() : null,
+                'submitted' => $paperEnrol ? false : ($status !== 'draft'),
+                'submitted_at' => ($paperEnrol || $status === 'draft') ? null : now(),
             ]);
 
             $this->syncParents($application, $validated['parents'] ?? []);
-            return $application;
+
+            $student = null;
+
+            if ($paperEnrol && $paperData) {
+                $application->decisions()->create([
+                    'decision' => $paperData['paper_decision'],
+                    'approved_class_id' => $application->class_applied_id,
+                    'house_id' => $paperData['paper_house_id'] ?? null,
+                    'academic_year_id' => $academicYear->id,
+                    'comments' => $paperData['paper_comments'] ?? null,
+                    'principal_comments' => $paperData['paper_principal_comments'] ?? null,
+                    'decision_date' => now(),
+                    'decided_by' => request()->user()?->id,
+                ]);
+
+                $application->update(['status' => $paperData['paper_decision']]);
+
+                if ($paperData['paper_decision'] === 'approved'
+                    && $application->physical_file_status !== 'pending'
+                    && $application->class_applied_id) {
+                    $student = $this->createStudentRecord(
+                        $application,
+                        (int) $application->class_applied_id,
+                        (int) $paperData['paper_class_stream_id'],
+                        (int) $paperData['paper_house_id'],
+                        $academicYear->id
+                    );
+                }
+            }
+
+            return [$application, $student];
         });
 
         $this->audit('application_created_by_admin', $application, [
+            'paper_enrol' => $paperEnrol,
+            'enrolled' => $student !== null,
             'created_by' => $request->user()?->id,
         ]);
 
-        $application->load(['academicYear', 'classApplied', 'parents', 'documents']);
+        $message = 'Application created successfully.';
+        if ($paperEnrol) {
+            if ($student) {
+                $message = 'Paper enrolment complete — student is now in the selected class, stream, and house.';
+            } elseif ($paperData && $paperData['paper_decision'] === 'approved') {
+                $message = 'Application and decision saved. Enrolment pending physical file receipt.';
+            } else {
+                $message = 'Application and decision saved.';
+            }
+        }
+
+        $application->load([
+            'academicYear', 'classApplied', 'parents', 'documents',
+            'decisions.approvedClass:id,name', 'decisions.house:id,name',
+            'student.currentClass', 'student.currentClassStream.stream',
+            'student.house', 'student.academicYear',
+        ]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Application created successfully.',
+            'message' => $message,
+            'enrolled' => $student !== null,
             'data' => $application,
         ], 201);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | UPDATE
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ UPDATE */
     public function update(Request $request, AdmissionApplication $application)
     {
         $validated = $this->validateApplicationPayload($request);
 
-        DB::transaction(function () use ($application, $validated) {
-            if (!empty($validated['academic_year_id'])) {
-                $application->academic_year_id = $validated['academic_year_id'];
-            }
-            $resolvedClass = $this->resolveClassId($validated);
-            if ($resolvedClass !== null) {
-                $application->class_applied_id = $resolvedClass;
-            }
-            if (array_key_exists('contact_email', $validated)) {
-                $application->contact_email = $validated['contact_email'];
-            }
+        $userRole = $request->user()?->role;
+        $canEditPrincipal = in_array($userRole, ['headteacher', 'principal', 'administrator'], true);
 
-            $student = $validated['student'] ?? [];
+        DB::transaction(function () use ($application, $validated, $canEditPrincipal) {
+            if (!empty($validated['academic_year_id'])) $application->academic_year_id = $validated['academic_year_id'];
+            $resolved = $this->resolveClassId($validated);
+            if ($resolved !== null) $application->class_applied_id = $resolved;
+            if (array_key_exists('contact_email', $validated)) $application->contact_email = $validated['contact_email'];
 
+            $s = $validated['student'] ?? [];
             $application->fill([
-                'legal_first_name' => $student['legal_first_name'] ?? null,
-                'middle_name' => $student['middle_name'] ?? null,
-                'legal_surname' => $student['legal_surname'] ?? null,
-                'date_of_birth' => $this->normalizeDate($student['date_of_birth'] ?? null),
-                'gender' => $student['gender'] ?? null,
-                'blood_group' => $student['blood_group'] ?? null,
-                'weight_kg' => $student['weight_kg'] ?? null,
-                'height_cm' => $student['height_cm'] ?? null,
-                'first_language' => $student['first_language'] ?? null,
-                'nationality' => $student['nationality'] ?? null,
-                'religion' => $student['religion'] ?? null,
-                'emergency_contact' => $student['emergency_contact'] ?? null,
-                'family_member_count' => $student['family_member_count'] ?? null,
-                'student_lives_with' => $student['student_lives_with'] ?? null,
-                'children_at_mount_view' => $student['children_at_mount_view'] ?? null,
-                'siblings_at_mount_view' => $student['siblings_at_mount_view'] ?? null,
-                'email_with_mount_view' => $student['email_with_mount_view'] ?? null,
-                'physical_address' => $student['physical_address'] ?? null,
-                'medical_conditions' => $student['medical_conditions'] ?? null,
-                'allergies' => $student['allergies'] ?? null,
-                'learning_needs' => $student['learning_needs'] ?? null,
-                'family_doctor_name' => $student['family_doctor_name'] ?? null,
-                'family_doctor_phone' => $student['family_doctor_phone'] ?? null,
-                'previous_school_name' => $student['previous_school_name'] ?? null,
-                'previous_school_address' => $student['previous_school_address'] ?? null,
-                'previous_class' => $student['previous_class'] ?? null,
-                'previous_year' => $student['previous_year'] ?? null,
-                'reason_for_leaving' => $student['reason_for_leaving'] ?? null,
-                'previous_school_contact' => $student['previous_school_contact'] ?? null,
-                'previous_school_country' => $student['previous_school_country'] ?? null,
-                'previous_school_language' => $student['previous_school_language'] ?? null,
+                'legal_first_name' => $s['legal_first_name'] ?? null,
+                'middle_name' => $s['middle_name'] ?? null,
+                'legal_surname' => $s['legal_surname'] ?? null,
+                'date_of_birth' => $this->normalizeDate($s['date_of_birth'] ?? null),
+                'gender' => $s['gender'] ?? null,
+                'blood_group' => $s['blood_group'] ?? null,
+                'weight_kg' => $s['weight_kg'] ?? null,
+                'height_cm' => $s['height_cm'] ?? null,
+                'first_language' => $s['first_language'] ?? null,
+                'nationality' => $s['nationality'] ?? null,
+                'religion' => $s['religion'] ?? null,
+                'emergency_contact' => $s['emergency_contact'] ?? null,
+                'family_member_count' => $s['family_member_count'] ?? null,
+                'student_lives_with' => $s['student_lives_with'] ?? null,
+                'children_at_mount_view' => $s['children_at_mount_view'] ?? null,
+                'siblings_at_mount_view' => $s['siblings_at_mount_view'] ?? null,
+                'email_with_mount_view' => $s['email_with_mount_view'] ?? null,
+                'physical_address' => $s['physical_address'] ?? null,
+                'medical_conditions' => $s['medical_conditions'] ?? null,
+                'allergies' => $s['allergies'] ?? null,
+                'learning_needs' => $s['learning_needs'] ?? null,
+                'family_doctor_name' => $s['family_doctor_name'] ?? null,
+                'family_doctor_phone' => $s['family_doctor_phone'] ?? null,
+                'previous_school_name' => $s['previous_school_name'] ?? null,
+                'previous_school_address' => $s['previous_school_address'] ?? null,
+                'previous_class' => $s['previous_class'] ?? null,
+                'previous_year' => $s['previous_year'] ?? null,
+                'previous_school_contact' => $s['previous_school_contact'] ?? null,
+                'previous_school_country' => $s['previous_school_country'] ?? null,
+                'previous_school_language' => $s['previous_school_language'] ?? null,
             ]);
 
-            if (array_key_exists('source', $validated)) {
-                $application->source = $validated['source'];
+            if (array_key_exists('source', $validated)) $application->source = $validated['source'];
+            if (array_key_exists('physical_file_status', $validated)) $application->physical_file_status = $validated['physical_file_status'];
+            if ($canEditPrincipal && array_key_exists('principal_comments', $validated)) {
+                $application->principal_comments = $validated['principal_comments'];
             }
 
             if (!empty($validated['status'])) {
-                $newStatus = $validated['status'];
-                if (
-                    !$application->submitted &&
-                    $application->status === 'draft' &&
-                    $newStatus !== 'draft'
-                ) {
+                $new = $validated['status'];
+                if (!$application->submitted && $application->status === 'draft' && $new !== 'draft') {
                     $application->submitted = true;
                     $application->submitted_at = now();
                 }
-                $application->status = $newStatus;
+                $application->status = $new;
             }
 
             $application->save();
@@ -319,32 +330,19 @@ class AdminAdmissionController extends Controller
             'academicYear', 'classApplied', 'parents',
             'documents.verifiedBy:id,name',
             'assessments.results', 'assessments.assessor:id,name',
-            'decisions.decidedBy:id,name',
-            'decisions.approvedClass:id,name',
-            'decisions.house:id,name,colour',
-            'decisions.academicYear:id,name',
+            'decisions.decidedBy:id,name', 'decisions.approvedClass:id,name',
+            'decisions.house:id,name,colour', 'decisions.academicYear:id,name',
             'comments.user:id,name',
-            'student.currentClass', 'student.house', 'student.academicYear',
+            'student.currentClass', 'student.currentClassStream.stream',
+            'student.house', 'student.academicYear',
         ]);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Application updated successfully.',
-            'data' => $application,
-        ]);
+        return response()->json(['success' => true, 'message' => 'Application updated successfully.', 'data' => $application]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | VERIFY DOCUMENT
-    |--------------------------------------------------------------------------
-    */
-
-    public function verifyDocument(
-        Request $request,
-        AdmissionApplication $application,
-        ApplicationDocument $document
-    ) {
+    /* ============================================================ DOCUMENTS */
+    public function verifyDocument(Request $request, AdmissionApplication $application, ApplicationDocument $document)
+    {
         abort_unless($document->admission_application_id === $application->id, 404);
 
         $validated = $request->validate([
@@ -353,23 +351,18 @@ class AdminAdmissionController extends Controller
             'verification_notes' => ['nullable', 'string'],
         ]);
 
-        $physicalReceived = $validated['physical_received'] ?? $document->physical_received;
+        $physical = $validated['physical_received'] ?? $document->physical_received;
 
         $document->update([
             'verification_status' => $validated['verification_status'],
-            'physical_received' => $physicalReceived,
-            'physical_received_at' => $physicalReceived
-                ? ($document->physical_received_at ?: now())
-                : null,
+            'physical_received' => $physical,
+            'physical_received_at' => $physical ? ($document->physical_received_at ?: now()) : null,
             'verification_notes' => $validated['verification_notes'] ?? null,
             'verified_by' => $request->user()->id,
             'verified_at' => now(),
         ]);
 
-        $this->audit('verify_document', $application, [
-            'document_id' => $document->id,
-            'status' => $validated['verification_status'],
-        ]);
+        $this->audit('verify_document', $application, ['document_id' => $document->id, 'status' => $validated['verification_status']]);
 
         return response()->json([
             'success' => true,
@@ -383,9 +376,7 @@ class AdminAdmissionController extends Controller
         abort_unless($document->admission_application_id === $application->id, 404);
         $disk = Storage::disk('local');
         if (!$disk->exists($document->file_path)) abort(404);
-
         $filename = $this->documentFilename($application, $document);
-
         return $disk->response($document->file_path, $filename, [
             'Content-Type' => $document->mime_type ?? 'application/octet-stream',
             'Content-Disposition' => "inline; filename=\"{$filename}\"",
@@ -397,36 +388,29 @@ class AdminAdmissionController extends Controller
         abort_unless($document->admission_application_id === $application->id, 404);
         $disk = Storage::disk('local');
         if (!$disk->exists($document->file_path)) abort(404);
-
         $filename = $this->documentFilename($application, $document);
-
         return $disk->download($document->file_path, $filename, [
             'Content-Type' => $document->mime_type ?? 'application/octet-stream',
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ASSESSMENTS
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ ASSESSMENTS */
     public function scheduleAssessment(Request $request, AdmissionApplication $application)
     {
         $validated = $request->validate([
-            'assessment_date' => ['required', 'date'],
+            'assessment_date' => ['nullable', 'date'],
             'assessment_time' => ['nullable', 'date_format:H:i'],
             'location' => ['nullable', 'string', 'max:255'],
             'assessor_id' => ['nullable', 'integer', 'exists:users,id'],
             'assessment_type' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $validated['assessment_date'] = $validated['assessment_date'] ?? now()->toDateString();
+
         $assessment = $application->assessments()->create($validated);
         $application->update(['status' => 'assessment_scheduled']);
 
-        $this->audit('assessment_scheduled', $application, [
-            'assessment_id' => $assessment->id,
-        ]);
+        $this->audit('assessment_scheduled', $application, ['assessment_id' => $assessment->id]);
 
         return response()->json([
             'success' => true,
@@ -438,9 +422,7 @@ class AdminAdmissionController extends Controller
     public function completeAssessment(Request $request, Assessment $assessment)
     {
         $validated = $request->validate([
-            'result' => ['required', Rule::in([
-                'pass', 'fail', 'pending', 'recommended', 'not_recommended',
-            ])],
+            'result' => ['required', Rule::in(['pass', 'fail', 'pending', 'recommended', 'not_recommended'])],
             'comments' => ['nullable', 'string'],
             'recommendation' => ['nullable', 'string'],
             'results' => ['nullable', 'array'],
@@ -452,20 +434,25 @@ class AdminAdmissionController extends Controller
 
         DB::transaction(function () use ($assessment, $validated) {
             $assessment->update(collect($validated)->except('results')->all());
-
             if (array_key_exists('results', $validated)) {
                 $assessment->results()->delete();
-                foreach ($validated['results'] ?? [] as $result) {
-                    $assessment->results()->create($result);
-                }
+                foreach ($validated['results'] ?? [] as $r) $assessment->results()->create($r);
             }
-
             $assessment->application()->update(['status' => 'assessment_completed']);
         });
 
-        $this->audit('assessment_completed', $assessment->application, [
-            'assessment_id' => $assessment->id,
-        ]);
+        $application = $assessment->application;
+
+        if (in_array($validated['result'], ['pass', 'recommended'], true)) {
+            $headteachers = \App\Models\User::where('is_active', true)
+                ->whereIn('role', ['headteacher', 'principal'])->get();
+            foreach ($headteachers as $ht) {
+                try { $ht->notify(new AssessmentPassedNotification($application)); }
+                catch (\Throwable $e) { Log::error('Assessment notification failed', ['user_id' => $ht->id, 'error' => $e->getMessage()]); }
+            }
+        }
+
+        $this->audit('assessment_completed', $application, ['assessment_id' => $assessment->id]);
 
         return response()->json([
             'success' => true,
@@ -474,12 +461,7 @@ class AdminAdmissionController extends Controller
         ]);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DECISION (create, update, delete)
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ DECISIONS */
     public function decide(Request $request, AdmissionApplication $application)
     {
         $validated = $request->validate([
@@ -496,14 +478,11 @@ class AdminAdmissionController extends Controller
         $this->resolveDecisionForeignKeys($validated);
 
         if ($validated['decision'] === 'approved' && empty($validated['approved_class_id'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'An approved class is required when approving an application.',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'An approved class is required when approving.'], 422);
         }
 
         $decision = DB::transaction(function () use ($request, $application, $validated) {
-            $decision = $application->decisions()->create([
+            $d = $application->decisions()->create([
                 'decision' => $validated['decision'],
                 'approved_class_id' => $validated['approved_class_id'] ?? null,
                 'house_id' => $validated['house_id'] ?? null,
@@ -513,33 +492,24 @@ class AdminAdmissionController extends Controller
                 'decision_date' => now(),
                 'decided_by' => $request->user()->id,
             ]);
-
             $application->update([
                 'status' => $validated['decision'],
                 'principal_comments' => $validated['principal_comments'] ?? null,
             ]);
-
-            return $decision;
+            return $d;
         });
 
-        $this->audit('admission_decision', $application, [
-            'decision' => $validated['decision'],
-        ]);
+        $this->audit('admission_decision', $application, ['decision' => $validated['decision']]);
 
         return response()->json([
             'success' => true,
             'message' => 'Admission decision recorded successfully.',
-            'data' => $decision->load(
-                'approvedClass', 'house', 'academicYear', 'decidedBy:id,name'
-            ),
+            'data' => $decision->load('approvedClass', 'house', 'academicYear', 'decidedBy:id,name'),
         ]);
     }
 
-    public function updateDecision(
-        Request $request,
-        AdmissionApplication $application,
-        AdmissionDecision $decision
-    ) {
+    public function updateDecision(Request $request, AdmissionApplication $application, AdmissionDecision $decision)
+    {
         abort_unless($decision->admission_application_id === $application->id, 404);
 
         $validated = $request->validate([
@@ -556,10 +526,7 @@ class AdminAdmissionController extends Controller
         $this->resolveDecisionForeignKeys($validated);
 
         if ($validated['decision'] === 'approved' && empty($validated['approved_class_id'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'An approved class is required when approving an application.',
-            ], 422);
+            return response()->json(['success' => false, 'message' => 'An approved class is required when approving.'], 422);
         }
 
         DB::transaction(function () use ($application, $decision, $validated) {
@@ -571,417 +538,330 @@ class AdminAdmissionController extends Controller
                 'comments' => $validated['comments'] ?? null,
                 'principal_comments' => $validated['principal_comments'] ?? null,
             ]);
-
             $application->update([
                 'status' => $validated['decision'],
                 'principal_comments' => $validated['principal_comments'] ?? null,
             ]);
         });
 
-        $this->audit('admission_decision_updated', $application, [
-            'decision_id' => $decision->id,
-        ]);
+        $this->audit('admission_decision_updated', $application, ['decision_id' => $decision->id]);
 
         return response()->json([
             'success' => true,
             'message' => 'Decision updated successfully.',
-            'data' => $decision->fresh()->load(
-                'approvedClass', 'house', 'academicYear', 'decidedBy:id,name'
-            ),
+            'data' => $decision->fresh()->load('approvedClass', 'house', 'academicYear', 'decidedBy:id,name'),
         ]);
     }
 
     public function destroyDecision(AdmissionApplication $application, AdmissionDecision $decision)
     {
         abort_unless($decision->admission_application_id === $application->id, 404);
-
         $decision->delete();
-
-        $this->audit('admission_decision_deleted', $application, [
-            'decision_id' => $decision->id,
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Decision deleted successfully.',
-        ]);
+        $this->audit('admission_decision_deleted', $application, ['decision_id' => $decision->id]);
+        return response()->json(['success' => true, 'message' => 'Decision deleted successfully.']);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | ENROL
-    |--------------------------------------------------------------------------
-    */
-
+    /* ============================================================ ENROL (new student, auto-balance optional) */
     public function enrol(Request $request, AdmissionApplication $application)
     {
-        if ($application->status !== 'approved') {
+        if ($application->physical_file_status === 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'Only approved applications can be enrolled.',
+                'code' => 'PHYSICAL_FILE_PENDING',
+                'message' => 'Enrolment blocked. Mark the physical file as received first.',
             ], 422);
         }
 
+        if ($application->status !== 'approved') {
+            return response()->json(['success' => false, 'message' => 'Only approved applications can be enrolled.'], 422);
+        }
+
         if ($application->student) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Student record already exists.',
-                'data' => $application->student,
-            ], 200);
+            return response()->json(['success' => true, 'message' => 'Student already exists.', 'data' => $application->student], 200);
         }
 
         $validated = $request->validate([
             'class_id' => ['nullable', 'integer', 'exists:school_classes,id'],
-            'class_name' => ['nullable', 'string', 'max:255'],
+            'class_stream_id' => ['nullable', 'integer', 'exists:class_streams,id'],
             'house_id' => ['nullable', 'integer', 'exists:houses,id'],
-            'house_name' => ['nullable', 'string', 'max:255'],
             'academic_year_id' => ['required', 'integer', 'exists:academic_years,id'],
+            'auto_assign' => ['nullable', 'boolean'],
         ]);
 
-        /* Resolve class */
-        if (empty($validated['class_id']) && !empty($validated['class_name'])) {
-            $class = SchoolClass::firstOrCreate(
-                ['name' => $validated['class_name']],
-                ['is_active' => true, 'sort_order' => 99]
+        $classId = $validated['class_id'] ?? $application->class_applied_id;
+        if (!$classId) {
+            return response()->json(['success' => false, 'message' => 'A class is required.'], 422);
+        }
+
+        $classStreamId = $validated['class_stream_id'] ?? null;
+        $houseId = $validated['house_id'] ?? null;
+        $autoAssign = (bool) ($validated['auto_assign'] ?? false);
+
+        if ($autoAssign && (!$classStreamId || !$houseId)) {
+            $auto = $this->calculateBalancedAssignment(
+                (int) $classId,
+                $application->gender,
+                (int) $validated['academic_year_id']
             );
-            $validated['class_id'] = $class->id;
+            $classStreamId = $classStreamId ?? $auto['class_stream_id'];
+            $houseId = $houseId ?? $auto['house_id'];
         }
-        if (empty($validated['class_id']) && $application->class_applied_id) {
-            $validated['class_id'] = $application->class_applied_id;
+
+        if (!$classStreamId) {
+            return response()->json(['success' => false, 'message' => 'Select a class section, or enable auto-balance.'], 422);
         }
-        if (empty($validated['class_id'])) {
+        if (!$houseId) {
+            return response()->json(['success' => false, 'message' => 'Select a house, or enable auto-balance.'], 422);
+        }
+
+        $stream = ClassStream::find($classStreamId);
+        if (!$stream || $stream->school_class_id !== (int) $classId) {
+            return response()->json(['success' => false, 'message' => 'The selected section does not belong to the chosen class.'], 422);
+        }
+
+        $student = DB::transaction(fn () => $this->createStudentRecord(
+            $application, (int) $classId, (int) $classStreamId, (int) $houseId,
+            (int) $validated['academic_year_id']
+        ));
+
+        $this->audit('student_enrolled', $application, ['student_id' => $student->id, 'auto_assign' => $autoAssign]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Student enrolled successfully.',
+            'data' => $student->load('currentClass', 'currentClassStream.stream', 'house', 'academicYear'),
+        ], 201);
+    }
+
+    /* ============================================================ PAPER ENROL (fast-track, manual only) */
+    public function paperEnrol(Request $request, AdmissionApplication $application)
+    {
+        if ($application->physical_file_status === 'pending') {
             return response()->json([
                 'success' => false,
-                'message' => 'A class is required for enrolment.',
+                'code' => 'PHYSICAL_FILE_PENDING',
+                'message' => 'Enrolment blocked. Mark the physical file as received first.',
             ], 422);
         }
 
-        /* Resolve house */
-        if (empty($validated['house_id']) && !empty($validated['house_name'])) {
-            $house = \App\Models\House::firstOrCreate(
-                ['name' => $validated['house_name']],
-                ['is_active' => true, 'colour' => '#252B68']
-            );
-            $validated['house_id'] = $house->id;
+        if ($application->student) {
+            return response()->json(['success' => true, 'message' => 'Student already exists.', 'data' => $application->student], 200);
         }
 
-        $student = DB::transaction(function () use ($application, $validated) {
-            $year = \App\Models\AcademicYear::findOrFail($validated['academic_year_id']);
-            $yearNumber = preg_replace('/[^0-9]/', '', $year->name) ?: date('Y');
+        $validated = $request->validate([
+            'decision' => ['required', 'in:approved,denied,waitlisted'],
+            'class_id' => ['nullable', 'integer', 'exists:school_classes,id'],
+            'class_stream_id' => ['nullable', 'integer', 'exists:class_streams,id'],
+            'house_id' => ['nullable', 'integer', 'exists:houses,id'],
+            'academic_year_id' => ['required', 'integer', 'exists:academic_years,id'],
+            'comments' => ['nullable', 'string'],
+            'principal_comments' => ['nullable', 'string'],
+        ]);
 
-            $count = Student::where('academic_year_id', $year->id)
-                ->lockForUpdate()->count() + 1;
+        $academicYear = \App\Models\AcademicYear::findOrFail($validated['academic_year_id']);
+        $classId = $validated['class_id'] ?? $application->class_applied_id;
 
-            $number = 'MVIS-' . $yearNumber . '-'
-                . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+        if ($validated['decision'] === 'approved') {
+            if (!$classId) return response()->json(['success' => false, 'message' => 'A class is required when approving.'], 422);
+            if (empty($validated['class_stream_id'])) {
+                return response()->json(['success' => false, 'message' => 'Select the class section the student is already in.'], 422);
+            }
+            if (empty($validated['house_id'])) {
+                return response()->json(['success' => false, 'message' => 'Select the house the student is already in.'], 422);
+            }
+            $stream = ClassStream::find($validated['class_stream_id']);
+            if (!$stream || $stream->school_class_id !== (int) $classId) {
+                return response()->json(['success' => false, 'message' => 'The selected section does not belong to the chosen class.'], 422);
+            }
+        }
 
-            $student = Student::create([
-                'student_number' => $number,
-                'admission_application_id' => $application->id,
-                'first_name' => $application->legal_first_name,
-                'middle_name' => $application->middle_name,
-                'surname' => $application->legal_surname,
-                'date_of_birth' => $application->date_of_birth,
-                'gender' => $application->gender,
-                'blood_group' => $application->blood_group,
-                'nationality' => $application->nationality,
-                'first_language' => $application->first_language,
-                'religion' => $application->religion,
-                'photo_path' => $application->student_photo_path,
-                'current_class_id' => $validated['class_id'],
+        $student = DB::transaction(function () use ($application, $validated, $academicYear, $classId) {
+            $application->decisions()->create([
+                'decision' => $validated['decision'],
+                'approved_class_id' => $classId,
                 'house_id' => $validated['house_id'] ?? null,
-                'academic_year_id' => $validated['academic_year_id'],
-                'admission_date' => now()->toDateString(),
-                'status' => 'active',
-            ]);
-
-            StudentClassHistory::create([
-                'student_id' => $student->id,
-                'class_id' => $validated['class_id'],
-                'academic_year_id' => $validated['academic_year_id'],
-                'house_id' => $validated['house_id'] ?? null,
-                'start_date' => now()->toDateString(),
+                'academic_year_id' => $academicYear->id,
+                'comments' => $validated['comments'] ?? null,
+                'principal_comments' => $validated['principal_comments'] ?? null,
+                'decision_date' => now(),
+                'decided_by' => request()->user()?->id,
             ]);
 
             $application->update([
-                'status' => 'enrolled',
-                'enrolled_at' => now(),
+                'status' => $validated['decision'],
+                'principal_comments' => $validated['principal_comments'] ?? null,
+                'submitted' => true,
+                'submitted_at' => $application->submitted_at ?? now(),
             ]);
 
-            return $student;
+            if ($validated['decision'] !== 'approved') return null;
+
+            return $this->createStudentRecord(
+                $application,
+                (int) $classId,
+                (int) $validated['class_stream_id'],
+                (int) $validated['house_id'],
+                $academicYear->id
+            );
         });
 
-        $this->audit('student_enrolled', $application, ['student_id' => $student->id]);
+        $this->audit('student_paper_enrolled', $application, ['student_id' => $student?->id, 'manual_assignment' => true]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Student record created successfully.',
-            'data' => $student->load('currentClass', 'house', 'academicYear'),
+            'message' => $student
+                ? 'Paper enrolment complete — student is now in the selected class, stream, and house.'
+                : 'Decision recorded.',
+            'data' => $student
+                ? $student->load('currentClass', 'currentClassStream.stream', 'house', 'academicYear')
+                : $application->fresh(),
         ], 201);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | DASHBOARD
-    |--------------------------------------------------------------------------
-    */
-
-    public function dashboard()
+    /* ============================================================ REASSIGN */
+    public function reassignStudent(Request $request, Student $student)
     {
-        $query = AdmissionApplication::query()->whereNotIn('status', ['draft']);
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'total' => (clone $query)->count(),
-                'submitted' => (clone $query)->where('status', 'submitted')->count(),
-                'document_verification' => (clone $query)->where('status', 'document_verification')->count(),
-                'assessments_scheduled' => (clone $query)->where('status', 'assessment_scheduled')->count(),
-                'assessments_completed' => (clone $query)->where('status', 'assessment_completed')->count(),
-                'awaiting_approval' => (clone $query)->where('status', 'principal_review')->count(),
-                'approved' => (clone $query)->where('status', 'approved')->count(),
-                'denied' => (clone $query)->where('status', 'denied')->count(),
-                'waitlisted' => (clone $query)->where('status', 'waitlisted')->count(),
-                'enrolled' => (clone $query)->where('status', 'enrolled')->count(),
-            ],
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | NOTIFICATIONS
-    |--------------------------------------------------------------------------
-    */
-
-    public function notifications(Request $request)
-    {
-        $user = $request->user();
-
-        $notifications = $user->notifications()
-            ->orderByDesc('created_at')->limit(30)->get()
-            ->map(fn ($n) => [
-                'id' => $n->id,
-                'read_at' => $n->read_at,
-                'created_at' => $n->created_at,
-                'title' => $n->data['title'] ?? 'Notification',
-                'message' => $n->data['message'] ?? '',
-                'application_id' => $n->data['application_id'] ?? null,
-                'application_number' => $n->data['application_number'] ?? null,
-                'url' => $n->data['url'] ?? null,
-            ]);
-
-        return response()->json([
-            'success' => true,
-            'unread_count' => $user->unreadNotifications()->count(),
-            'data' => $notifications,
-        ]);
-    }
-
-    public function markNotificationRead(Request $request, string $id)
-    {
-        $notification = $request->user()->notifications()->where('id', $id)->first();
-        if ($notification) $notification->markAsRead();
-
-        return response()->json([
-            'success' => true,
-            'unread_count' => $request->user()->unreadNotifications()->count(),
-        ]);
-    }
-
-    public function markAllNotificationsRead(Request $request)
-    {
-        $request->user()->unreadNotifications->markAsRead();
-        return response()->json(['success' => true, 'unread_count' => 0]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | COMMENTS
-    |--------------------------------------------------------------------------
-    */
-
-    public function storeComment(Request $request, AdmissionApplication $application)
-    {
-        $user = $request->user();
-
-        if (!in_array($user->role, ['administrator', 'principal'], true)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Only the headteacher or an administrator can comment on applications.',
-            ], 403);
-        }
-
         $validated = $request->validate([
-            'body' => ['required', 'string', 'max:5000'],
+            'class_stream_id' => ['nullable', 'integer', 'exists:class_streams,id'],
+            'house_id' => ['nullable', 'integer', 'exists:houses,id'],
         ]);
 
-        $comment = $application->comments()->create([
-            'user_id' => $user->id,
-            'role_snapshot' => $user->role,
-            'body' => trim($validated['body']),
-        ]);
+        DB::transaction(function () use ($student, $validated) {
+            if (!empty($validated['class_stream_id'])) {
+                $stream = ClassStream::findOrFail($validated['class_stream_id']);
+                $student->update([
+                    'current_class_stream_id' => $stream->id,
+                    'current_class_id' => $stream->school_class_id,
+                ]);
+            }
+            if (array_key_exists('house_id', $validated)) {
+                $student->update(['house_id' => $validated['house_id']]);
+            }
+        });
 
-        $this->audit('comment_added', $application, ['comment_id' => $comment->id]);
+        $this->audit('student_reassigned', null, ['student_id' => $student->id]);
 
         return response()->json([
             'success' => true,
-            'message' => 'Comment added successfully.',
-            'data' => [
-                'id' => $comment->id,
-                'body' => $comment->body,
-                'role_snapshot' => $comment->role_snapshot,
-                'created_at' => $comment->created_at,
-                'author' => ['id' => $user->id, 'name' => $user->name],
-            ],
-        ], 201);
-    }
-
-    public function updateComment(
-        Request $request,
-        AdmissionApplication $application,
-        AdmissionComment $comment
-    ) {
-        abort_unless($comment->admission_application_id === $application->id, 404);
-
-        $user = $request->user();
-        if ($comment->user_id !== $user->id && $user->role !== 'administrator') {
-            return response()->json([
-                'success' => false,
-                'message' => 'You can only edit your own comments.',
-            ], 403);
-        }
-
-        $validated = $request->validate([
-            'body' => ['required', 'string', 'max:5000'],
-        ]);
-
-        $comment->update(['body' => trim($validated['body'])]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Comment updated successfully.',
-            'data' => $comment->fresh()->load('user:id,name'),
+            'message' => 'Student reassigned. Class and house balances have changed.',
+            'data' => $student->fresh()->load('currentClass', 'currentClassStream.stream', 'house'),
         ]);
     }
 
-    public function destroyComment(
-        Request $request,
-        AdmissionApplication $application,
-        AdmissionComment $comment
-    ) {
-        abort_unless($comment->admission_application_id === $application->id, 404);
-
-        $user = $request->user();
-        if ($comment->user_id !== $user->id && $user->role !== 'administrator') {
-            return response()->json([
-                'success' => false,
-                'message' => 'You can only delete your own comments.',
-            ], 403);
-        }
-
-        $comment->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Comment deleted successfully.',
-        ]);
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | PRINTABLE
-    |--------------------------------------------------------------------------
-    */
-
-    public function printApplication(Request $request, AdmissionApplication $application)
+    /* ============================================================ HELPERS */
+    private function calculateBalancedAssignment(int $classId, ?string $gender, int $academicYearId): array
     {
-        $token = $request->bearerToken() ?: $request->query('token');
+        $sections = ClassStream::where('school_class_id', $classId)
+            ->where('is_active', true)
+            ->withCount([
+                'students as gender_count' => function ($q) use ($gender) {
+                    $q->where('status', 'active');
+                    if ($gender) $q->where('gender', $gender);
+                },
+                'students as total_count' => fn ($q) => $q->where('status', 'active'),
+            ])
+            ->orderBy('gender_count')
+            ->orderBy('total_count')
+            ->get();
 
-        if (!$token) {
-            return $this->printErrorPage('Print session missing.',
-                'No access token was supplied. Please reopen the application from the admin portal.', 401);
-        }
+        $houses = \App\Models\House::where('is_active', true)
+            ->withCount([
+                'students as gender_count' => function ($q) use ($gender) {
+                    $q->where('status', 'active');
+                    if ($gender) $q->where('gender', $gender);
+                },
+                'students as total_count' => fn ($q) => $q->where('status', 'active'),
+            ])
+            ->orderBy('gender_count')
+            ->orderBy('total_count')
+            ->get();
 
-        $personalToken = PersonalAccessToken::findToken($token);
-        if (!$personalToken) {
-            return $this->printErrorPage('Print session expired.',
-                'Your access token is invalid or has expired. Please log in again and try printing again.', 401);
-        }
-
-        $user = $personalToken->tokenable;
-        if (!$user || !$user->is_active) {
-            return $this->printErrorPage('Account inactive.',
-                'Your account is inactive. Please contact an administrator.', 401);
-        }
-
-        if (!in_array($user->role, ['administrator', 'admissions_officer', 'principal'], true)) {
-            return $this->printErrorPage('Access denied.',
-                'You do not have permission to print this application.', 403);
-        }
-
-        $application->load([
-            'academicYear', 'classApplied', 'parents',
-            'documents.verifiedBy:id,name',
-            'assessments.results', 'assessments.assessor:id,name',
-            'decisions.decidedBy:id,name',
-            'decisions.approvedClass:id,name',
-            'decisions.house:id,name,colour',
-            'decisions.academicYear:id,name',
-            'termsAcceptances.termsCondition',
-            'comments.user:id,name',
-            'student.currentClass', 'student.house', 'student.academicYear',
-        ]);
-
-        return response($this->buildPrintHtml($application))
-            ->header('Content-Type', 'text/html; charset=utf-8');
+        return [
+            'class_stream_id' => $sections->first()?->id,
+            'house_id' => $houses->first()?->id,
+        ];
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | HELPERS
-    |--------------------------------------------------------------------------
-    */
+    private function createStudentRecord(
+        AdmissionApplication $application, int $classId,
+        ?int $classStreamId, ?int $houseId, int $academicYearId
+    ): Student {
+        $year = \App\Models\AcademicYear::findOrFail($academicYearId);
+        $yearNumber = preg_replace('/[^0-9]/', '', $year->name) ?: date('Y');
+        $count = Student::where('academic_year_id', $year->id)->lockForUpdate()->count() + 1;
+        $studentNumber = 'MVIS-' . $yearNumber . '-' . str_pad((string) $count, 4, '0', STR_PAD_LEFT);
+
+        $student = Student::create([
+            'student_number' => $studentNumber,
+            'admission_application_id' => $application->id,
+            'first_name' => $application->legal_first_name,
+            'middle_name' => $application->middle_name,
+            'surname' => $application->legal_surname,
+            'date_of_birth' => $application->date_of_birth,
+            'gender' => $application->gender,
+            'blood_group' => $application->blood_group,
+            'nationality' => $application->nationality,
+            'first_language' => $application->first_language,
+            'religion' => $application->religion,
+            'photo_path' => $application->student_photo_path,
+            'current_class_id' => $classId,
+            'current_class_stream_id' => $classStreamId,
+            'house_id' => $houseId,
+            'academic_year_id' => $academicYearId,
+            'admission_date' => now()->toDateString(),
+            'status' => 'active',
+        ]);
+
+        StudentClassHistory::create([
+            'student_id' => $student->id,
+            'class_id' => $classId,
+            'class_stream_id' => $classStreamId,
+            'academic_year_id' => $academicYearId,
+            'house_id' => $houseId,
+            'start_date' => now()->toDateString(),
+        ]);
+
+        $application->update(['status' => 'enrolled', 'enrolled_at' => now()]);
+
+        return $student;
+    }
 
     private function resolveClassId(array $validated): ?int
     {
-        if (!empty($validated['class_applied_id'])) {
-            return (int) $validated['class_applied_id'];
-        }
+        if (!empty($validated['class_applied_id'])) return (int) $validated['class_applied_id'];
         if (!empty($validated['class_applied_name'])) {
-            $class = SchoolClass::firstOrCreate(
-                ['name' => $validated['class_applied_name']],
-                ['is_active' => true, 'sort_order' => 99]
-            );
-            return (int) $class->id;
+            $c = SchoolClass::firstOrCreate(['name' => $validated['class_applied_name']], ['is_active' => true, 'sort_order' => 99]);
+            return (int) $c->id;
         }
         return null;
     }
 
     private function resolveDecisionForeignKeys(array &$validated): void
     {
-        if (
-            empty($validated['approved_class_id']) &&
-            !empty($validated['approved_class_name'])
-        ) {
-            $class = SchoolClass::firstOrCreate(
-                ['name' => $validated['approved_class_name']],
-                ['is_active' => true, 'sort_order' => 99]
-            );
-            $validated['approved_class_id'] = $class->id;
+        if (empty($validated['approved_class_id']) && !empty($validated['approved_class_name'])) {
+            $c = SchoolClass::firstOrCreate(['name' => $validated['approved_class_name']], ['is_active' => true, 'sort_order' => 99]);
+            $validated['approved_class_id'] = $c->id;
         }
-
         if (empty($validated['house_id']) && !empty($validated['house_name'])) {
-            $house = \App\Models\House::firstOrCreate(
-                ['name' => $validated['house_name']],
-                ['is_active' => true, 'colour' => '#252B68']
-            );
-            $validated['house_id'] = $house->id;
+            $h = \App\Models\House::firstOrCreate(['name' => $validated['house_name']], ['is_active' => true, 'colour' => '#252B68']);
+            $validated['house_id'] = $h->id;
         }
+    }
+
+    private function validateDateOfBirth(?string $date): ?string
+    {
+        if (!$date) return null;
+        try { $d = Carbon::parse($date); } catch (\Throwable $e) { return 'Invalid date of birth.'; }
+        $now = Carbon::now()->startOfDay();
+        if ($d->isFuture()) return 'Date of birth cannot be in the future.';
+        if ($d->diffInMonths($now) < 12) return 'The student must be at least 12 months old.';
+        if ($d->diffInYears($now) > 30) return 'The date of birth is not realistic for an applicant.';
+        return null;
     }
 
     private function validateApplicationPayload(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'status' => ['nullable', Rule::in([
                 'draft', 'submitted', 'document_verification', 'assessment_scheduled',
                 'assessment_completed', 'principal_review', 'approved',
@@ -992,19 +872,24 @@ class AdminAdmissionController extends Controller
             'class_applied_id' => ['nullable', 'integer', 'exists:school_classes,id'],
             'class_applied_name' => ['nullable', 'string', 'max:255'],
             'contact_email' => ['nullable', 'email', 'max:255'],
+            'physical_file_status' => ['nullable', Rule::in(['pending', 'received', 'not_required'])],
+            'principal_comments' => ['nullable', 'string'],
 
             'student' => ['required', 'array'],
             'student.legal_first_name' => ['required', 'string', 'max:255'],
             'student.legal_surname' => ['required', 'string', 'max:255'],
             'student.middle_name' => ['nullable', 'string', 'max:255'],
             'student.date_of_birth' => ['nullable', 'date'],
-            'student.gender' => ['nullable', 'string', 'max:50'],
+
+            // REQUIRED
+            'student.gender' => ['required', 'string', 'max:50'],
+            'student.first_language' => ['required', 'string', 'max:100'],
+            'student.nationality' => ['required', 'string', 'max:100'],
+            'student.religion' => ['required', 'string', 'max:100'],
+
             'student.blood_group' => ['nullable', 'string', 'max:10'],
             'student.weight_kg' => ['nullable', 'numeric'],
             'student.height_cm' => ['nullable', 'numeric'],
-            'student.first_language' => ['nullable', 'string', 'max:100'],
-            'student.nationality' => ['nullable', 'string', 'max:100'],
-            'student.religion' => ['nullable', 'string', 'max:100'],
             'student.emergency_contact' => ['nullable', 'string', 'max:100'],
             'student.family_member_count' => ['nullable', 'integer', 'min:0'],
             'student.student_lives_with' => ['nullable', 'string', 'max:100'],
@@ -1013,16 +898,19 @@ class AdminAdmissionController extends Controller
             'student.siblings_at_mount_view.*' => ['nullable', 'string', 'max:255'],
             'student.email_with_mount_view' => ['nullable', 'email', 'max:255'],
             'student.physical_address' => ['nullable', 'string'],
+
+            // Medical: accepts "None" as a valid string
             'student.medical_conditions' => ['nullable', 'string'],
             'student.allergies' => ['nullable', 'string'],
             'student.learning_needs' => ['nullable', 'string'],
             'student.family_doctor_name' => ['nullable', 'string', 'max:255'],
             'student.family_doctor_phone' => ['nullable', 'string', 'max:50'],
+
+            // Previous school: nullable because early-years students may have none
             'student.previous_school_name' => ['nullable', 'string', 'max:255'],
             'student.previous_school_address' => ['nullable', 'string'],
             'student.previous_class' => ['nullable', 'string', 'max:100'],
             'student.previous_year' => ['nullable', 'string', 'max:20'],
-            'student.reason_for_leaving' => ['nullable', 'string'],
             'student.previous_school_contact' => ['nullable', 'string', 'max:255'],
             'student.previous_school_country' => ['nullable', 'string', 'max:100'],
             'student.previous_school_language' => ['nullable', 'string', 'max:100'],
@@ -1046,18 +934,20 @@ class AdminAdmissionController extends Controller
             'parents.*.preferred_communication' => ['nullable', 'string', 'max:50'],
             'parents.*.is_primary' => ['nullable', 'boolean'],
         ]);
+
+        $dobError = $this->validateDateOfBirth($data['student']['date_of_birth'] ?? null);
+        if ($dobError) {
+            throw ValidationException::withMessages(['student.date_of_birth' => $dobError]);
+        }
+
+        return $data;
     }
 
     private function syncParents(AdmissionApplication $application, array $parents): void
     {
         $application->parents()->delete();
-
         foreach ($parents as $parent) {
-            $employerPays = filter_var(
-                $parent['employer_pays_fees'] ?? false,
-                FILTER_VALIDATE_BOOLEAN
-            );
-
+            $employerPays = filter_var($parent['employer_pays_fees'] ?? false, FILTER_VALIDATE_BOOLEAN);
             $application->parents()->create([
                 'full_name' => $parent['full_name'],
                 'relationship' => $parent['relationship'],
@@ -1069,20 +959,13 @@ class AdminAdmissionController extends Controller
                 'work_address' => $parent['work_address'] ?? null,
                 'work_phone' => $parent['work_phone'] ?? null,
                 'employer_pays_fees' => $employerPays,
-                'employer_payment_percentage' => $employerPays &&
-                    isset($parent['employer_payment_percentage']) &&
-                    $parent['employer_payment_percentage'] !== ''
-                        ? (int) $parent['employer_payment_percentage']
-                        : null,
+                'employer_payment_percentage' => $employerPays && isset($parent['employer_payment_percentage']) && $parent['employer_payment_percentage'] !== ''
+                    ? (int) $parent['employer_payment_percentage'] : null,
                 'physical_address' => $parent['physical_address'] ?? null,
                 'postal_address' => $parent['postal_address'] ?? null,
-                'emergency_contact' => filter_var(
-                    $parent['emergency_contact'] ?? false, FILTER_VALIDATE_BOOLEAN
-                ),
+                'emergency_contact' => filter_var($parent['emergency_contact'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'preferred_communication' => $parent['preferred_communication'] ?? null,
-                'is_primary' => filter_var(
-                    $parent['is_primary'] ?? false, FILTER_VALIDATE_BOOLEAN
-                ),
+                'is_primary' => filter_var($parent['is_primary'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ]);
         }
     }
@@ -1096,48 +979,161 @@ class AdminAdmissionController extends Controller
 
     private function documentFilename(AdmissionApplication $application, ApplicationDocument $document): string
     {
-        $studentName = trim(
-            ($application->legal_first_name ?? '') . ' ' .
-            ($application->legal_surname ?? '')
-        );
+        $studentName = trim(($application->legal_first_name ?? '') . ' ' . ($application->legal_surname ?? ''));
         $studentSlug = Str::slug($studentName, '_') ?: 'student';
-
-        $typeLabels = [
+        $labels = [
             'birth_certificate_or_passport' => 'Birth_Certificate_or_Main_Passport_Pages',
             'passport_photograph_1' => 'Passport_Photograph_1',
             'passport_photograph_2' => 'Passport_Photograph_2',
             'school_report' => 'Original_Mark_Sheets_or_School_Report',
         ];
-        $typeSlug = $typeLabels[$document->document_type]
-            ?? Str::slug($document->document_type, '_');
+        $typeSlug = $labels[$document->document_type] ?? Str::slug($document->document_type, '_');
+        $ext = strtolower(pathinfo($document->original_name, PATHINFO_EXTENSION)) ?: 'pdf';
+        return "{$studentSlug}_{$typeSlug}.{$ext}";
+    }
 
-        $extension = strtolower(pathinfo($document->original_name, PATHINFO_EXTENSION)) ?: 'pdf';
+    /* ============================================================ DASHBOARD / NOTIFS */
+    public function dashboard()
+    {
+        $q = AdmissionApplication::whereNotIn('status', ['draft']);
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total' => (clone $q)->count(),
+                'submitted' => (clone $q)->where('status', 'submitted')->count(),
+                'document_verification' => (clone $q)->where('status', 'document_verification')->count(),
+                'assessments_scheduled' => (clone $q)->where('status', 'assessment_scheduled')->count(),
+                'assessments_completed' => (clone $q)->where('status', 'assessment_completed')->count(),
+                'awaiting_approval' => (clone $q)->where('status', 'principal_review')->count(),
+                'approved' => (clone $q)->where('status', 'approved')->count(),
+                'denied' => (clone $q)->where('status', 'denied')->count(),
+                'waitlisted' => (clone $q)->where('status', 'waitlisted')->count(),
+                'enrolled' => (clone $q)->where('status', 'enrolled')->count(),
+            ],
+        ]);
+    }
 
-        return "{$studentSlug}_{$typeSlug}.{$extension}";
+    public function notifications(Request $request)
+    {
+        $user = $request->user();
+        $notifications = $user->notifications()->orderByDesc('created_at')->limit(30)->get()
+            ->map(fn ($n) => [
+                'id' => $n->id, 'read_at' => $n->read_at, 'created_at' => $n->created_at,
+                'title' => $n->data['title'] ?? 'Notification',
+                'message' => $n->data['message'] ?? '',
+                'application_id' => $n->data['application_id'] ?? null,
+                'application_number' => $n->data['application_number'] ?? null,
+                'url' => $n->data['url'] ?? null,
+            ]);
+        return response()->json([
+            'success' => true,
+            'unread_count' => $user->unreadNotifications()->count(),
+            'data' => $notifications,
+        ]);
+    }
+
+    public function markNotificationRead(Request $request, string $id)
+    {
+        $n = $request->user()->notifications()->where('id', $id)->first();
+        if ($n) $n->markAsRead();
+        return response()->json(['success' => true, 'unread_count' => $request->user()->unreadNotifications()->count()]);
+    }
+
+    public function markAllNotificationsRead(Request $request)
+    {
+        $request->user()->unreadNotifications->markAsRead();
+        return response()->json(['success' => true, 'unread_count' => 0]);
+    }
+
+    /* ============================================================ COMMENTS */
+    public function storeComment(Request $request, AdmissionApplication $application)
+    {
+        $user = $request->user();
+        if (!in_array($user->role, ['administrator', 'principal', 'headteacher'], true)) {
+            return response()->json(['success' => false, 'message' => 'Only the headteacher or administrator can comment.'], 403);
+        }
+        $validated = $request->validate(['body' => ['required', 'string', 'max:5000']]);
+        $comment = $application->comments()->create([
+            'user_id' => $user->id, 'role_snapshot' => $user->role, 'body' => trim($validated['body']),
+        ]);
+        $this->audit('comment_added', $application, ['comment_id' => $comment->id]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Comment added.',
+            'data' => [
+                'id' => $comment->id, 'body' => $comment->body, 'role_snapshot' => $comment->role_snapshot,
+                'created_at' => $comment->created_at,
+                'author' => ['id' => $user->id, 'name' => $user->name],
+            ],
+        ], 201);
+    }
+
+    public function updateComment(Request $request, AdmissionApplication $application, AdmissionComment $comment)
+    {
+        abort_unless($comment->admission_application_id === $application->id, 404);
+        $user = $request->user();
+        if ($comment->user_id !== $user->id && $user->role !== 'administrator') {
+            return response()->json(['success' => false, 'message' => 'You can only edit your own comments.'], 403);
+        }
+        $validated = $request->validate(['body' => ['required', 'string', 'max:5000']]);
+        $comment->update(['body' => trim($validated['body'])]);
+        return response()->json(['success' => true, 'message' => 'Comment updated.', 'data' => $comment->fresh()->load('user:id,name')]);
+    }
+
+    public function destroyComment(Request $request, AdmissionApplication $application, AdmissionComment $comment)
+    {
+        abort_unless($comment->admission_application_id === $application->id, 404);
+        $user = $request->user();
+        if ($comment->user_id !== $user->id && $user->role !== 'administrator') {
+            return response()->json(['success' => false, 'message' => 'You can only delete your own comments.'], 403);
+        }
+        $comment->delete();
+        return response()->json(['success' => true, 'message' => 'Comment deleted.']);
+    }
+
+    /* ============================================================ PRINT */
+    public function printApplication(Request $request, AdmissionApplication $application)
+    {
+        $token = $request->bearerToken() ?: $request->query('token');
+        if (!$token) return $this->printErrorPage('Print session missing.', 'No access token was supplied.', 401);
+        $personal = PersonalAccessToken::findToken($token);
+        if (!$personal) return $this->printErrorPage('Print session expired.', 'Your access token is invalid.', 401);
+        $user = $personal->tokenable;
+        if (!$user || !$user->is_active) return $this->printErrorPage('Account inactive.', 'Your account is inactive.', 401);
+        if (!in_array($user->role, ['administrator', 'admissions_officer', 'principal', 'headteacher'], true)) {
+            return $this->printErrorPage('Access denied.', 'You do not have permission to print.', 403);
+        }
+
+        $application->load([
+            'academicYear', 'classApplied', 'parents',
+            'documents.verifiedBy:id,name',
+            'assessments.results', 'assessments.assessor:id,name',
+            'decisions.decidedBy:id,name', 'decisions.approvedClass:id,name',
+            'decisions.house:id,name,colour', 'decisions.academicYear:id,name',
+            'termsAcceptances.termsCondition', 'comments.user:id,name',
+            'student.currentClass', 'student.currentClassStream.stream',
+            'student.house', 'student.academicYear',
+        ]);
+
+        return response($this->buildPrintHtml($application))->header('Content-Type', 'text/html; charset=utf-8');
     }
 
     private function printErrorPage(string $heading, string $message, int $status)
     {
         $e = fn ($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
-        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' .
-            $e($heading) . '</title><style>body{font-family:Arial;padding:40px;background:#f8fafc;color:#172033}' .
+        $html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' . $e($heading) .
+            '</title><style>body{font-family:Arial;padding:40px;background:#f8fafc;color:#172033}' .
             '.card{max-width:480px;margin:40px auto;border:1px solid #e2e8f0;border-radius:16px;padding:24px;background:#fff}' .
             'h1{color:#252B68;font-size:20px;margin:0 0 8px}p{color:#4b5563;font-size:14px;line-height:1.5;margin:0}' .
             '.brand{color:#F58220;font-size:11px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}' .
             '</style></head><body><div class="card"><div class="brand">Mount View Admin</div>' .
             '<h1>' . $e($heading) . '</h1><p>' . $e($message) . '</p></div></body></html>';
-
         return response($html, $status)->header('Content-Type', 'text/html; charset=utf-8');
     }
 
     private function getLogoBase64(): ?string
     {
-        $candidates = [
-            public_path('logo.jpg'), public_path('logo.png'),
-            public_path('images/logo.jpg'), public_path('images/logo.png'),
-            storage_path('app/public/logo.jpg'), storage_path('app/public/logo.png'),
-        ];
-        foreach ($candidates as $path) {
+        foreach ([public_path('logo.jpg'), public_path('logo.png'), public_path('images/logo.jpg'), public_path('images/logo.png'), storage_path('app/public/logo.jpg'), storage_path('app/public/logo.png')] as $path) {
             if (!is_file($path)) continue;
             $data = @file_get_contents($path);
             if ($data === false || $data === '') continue;
@@ -1160,59 +1156,37 @@ class AdminAdmissionController extends Controller
 
     private function buildPrintHtml(AdmissionApplication $application): string
     {
-        $e = fn ($value) => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES, 'UTF-8');
-        $fmtDate = function ($value) {
-            if (!$value) return '—';
-            try { return Carbon::parse($value)->format('d M Y'); }
-            catch (\Throwable $ex) { return (string) $value; }
-        };
-        $fmtDateTime = function ($value) {
-            if (!$value) return '—';
-            try { return Carbon::parse($value)->format('d M Y, H:i'); }
-            catch (\Throwable $ex) { return (string) $value; }
-        };
+        $e = fn ($v) => htmlspecialchars((string) ($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $fmtDate = fn ($v) => $v ? Carbon::parse($v)->format('d M Y') : '—';
+        $fmtDT = fn ($v) => $v ? Carbon::parse($v)->format('d M Y, H:i') : '—';
 
-        $logoBase64 = $this->getLogoBase64();
-        $headerLogoHtml = $logoBase64
-            ? '<img src="' . $logoBase64 . '" alt="Mount View" class="header-logo">' : '';
-        $watermarkHtml = $logoBase64
-            ? '<div class="watermark" aria-hidden="true"><img src="' . $logoBase64 . '" alt=""></div>' : '';
+        $logo = $this->getLogoBase64();
+        $logoHtml = $logo ? '<img src="' . $logo . '" alt="Mount View" class="header-logo">' : '';
+        $watermarkHtml = $logo ? '<div class="watermark"><img src="' . $logo . '" alt=""></div>' : '';
 
-        $photoBase64 = $this->getLocalFileBase64($application->student_photo_path);
-        $photoHtml = $photoBase64
-            ? '<img src="' . $photoBase64 . '" alt="Student photograph" class="student-photo">'
+        $photo = $this->getLocalFileBase64($application->student_photo_path);
+        $photoHtml = $photo
+            ? '<img src="' . $photo . '" alt="" class="student-photo">'
             : '<div class="student-photo placeholder">No photograph</div>';
 
-        $renderRows = function (array $pairs) use ($e) {
-            $html = '';
-            foreach ($pairs as $label => $value) {
-                $html .= '<tr><th>' . $e($label) . '</th><td>' .
-                    ($value === '' || $value === null ? '—' : $e($value)) . '</td></tr>';
+        $rows = function (array $pairs) use ($e) {
+            $h = '';
+            foreach ($pairs as $l => $v) {
+                $h .= '<tr><th>' . $e($l) . '</th><td>' . ($v === '' || $v === null ? '—' : $e($v)) . '</td></tr>';
             }
-            return $html;
+            return $h;
         };
 
-        $fullName = trim(
-            ($application->legal_first_name ?? '') . ' ' .
-            ($application->middle_name ?? '') . ' ' .
-            ($application->legal_surname ?? '')
-        );
-        $fullNameEsc = $e($fullName);
-        $appNumberDisplay = $e($application->application_number);
+        $fullName = trim(($application->legal_first_name ?? '') . ' ' . ($application->middle_name ?? '') . ' ' . ($application->legal_surname ?? ''));
+        $appNum = $e($application->application_number);
         $statusLabel = $e(ucfirst(str_replace('_', ' ', $application->status ?? '')));
+        $classApplied = $application->classApplied?->name;
+        $academicYear = $application->academicYear?->name;
+        $submittedAt = $e($fmtDT($application->submitted_at));
+        $generatedAt = $e(now()->format('d M Y, H:i'));
+        $siblingsText = is_array($application->siblings_at_mount_view) ? implode(', ', $application->siblings_at_mount_view) : null;
 
-        $classAppliedName = $application->classApplied ? $application->classApplied->name : null;
-        $classAppliedDisplay = $e($classAppliedName);
-        $academicYearName = $application->academicYear ? $application->academicYear->name : null;
-        $academicYearDisplay = $e($academicYearName);
-        $sourceLabel = $e(ucfirst($application->source ?? ''));
-        $physicalFileLabel = $e(ucfirst(str_replace('_', ' ', $application->physical_file_status ?? '')));
-        $submittedAtDisplay = $e($fmtDateTime($application->submitted_at));
-        $generatedAtDisplay = $e(now()->format('d M Y, H:i'));
-        $siblingsText = is_array($application->siblings_at_mount_view)
-            ? implode(', ', $application->siblings_at_mount_view) : null;
-
-        $studentDetailsRows = $renderRows([
+        $studentRows = $rows([
             'Legal First Name' => $application->legal_first_name,
             'Middle Name' => $application->middle_name,
             'Legal Surname' => $application->legal_surname,
@@ -1230,12 +1204,12 @@ class AdminAdmissionController extends Controller
             'Children at Mount View' => $application->children_at_mount_view,
             'Siblings at Mount View' => $siblingsText,
             'Email with Mount View' => $application->email_with_mount_view,
-            'Class Applied For' => $classAppliedName,
-            'Academic Year' => $academicYearName,
+            'Class Applied For' => $classApplied,
+            'Academic Year' => $academicYear,
             'Physical Address' => $application->physical_address,
         ]);
 
-        $medicalRows = $renderRows([
+        $medicalRows = $rows([
             'Medical Conditions' => $application->medical_conditions,
             'Allergies' => $application->allergies,
             'Learning Needs' => $application->learning_needs,
@@ -1243,22 +1217,14 @@ class AdminAdmissionController extends Controller
             'Family Doctor Phone' => $application->family_doctor_phone,
         ]);
 
-        $previousSchoolRows = $renderRows([
+        $prevSchoolRows = $rows([
             'School Name' => $application->previous_school_name,
             'Country' => $application->previous_school_country,
             'Instructional Language' => $application->previous_school_language,
             'School Address' => $application->previous_school_address,
             'Previous Class' => $application->previous_class,
             'Previous Year' => $application->previous_year,
-            'Reason for Leaving' => $application->reason_for_leaving,
             'School Contact' => $application->previous_school_contact,
-        ]);
-
-        $notesRows = $renderRows([
-            'Parent Notes' => $application->parent_notes,
-            'Admissions Notes' => $application->admissions_notes,
-            'Administrator Comments' => $application->administrator_comments,
-            'Principal Comments' => $application->principal_comments,
         ]);
 
         $docLabels = [
@@ -1268,120 +1234,67 @@ class AdminAdmissionController extends Controller
             'school_report' => 'Original Mark Sheets / School Report',
         ];
 
-        $parentsHtml = '';
-        if ($application->parents->isEmpty()) {
-            $parentsHtml = '<tr><td colspan="4" class="empty">No parents recorded.</td></tr>';
-        } else {
-            foreach ($application->parents as $parent) {
-                $phoneValue = $parent->phone_number ?: $parent->phone;
-                $parentsHtml .= '<tr>';
-                $parentsHtml .= '<td>' . $e($parent->full_name) . '</td>';
-                $parentsHtml .= '<td>' . $e($parent->relationship) . '</td>';
-                $parentsHtml .= '<td>' . $e($phoneValue) . '</td>';
-                $parentsHtml .= '<td>' . $e($parent->email) . '</td>';
-                $parentsHtml .= '</tr>';
+        $parentsHtml = $application->parents->isEmpty()
+            ? '<tr><td colspan="4" class="empty">No parents recorded.</td></tr>'
+            : $application->parents->map(function ($p) use ($e) {
+                $phone = $p->phone_number ?: $p->phone;
+                return '<tr><td>' . $e($p->full_name) . '</td><td>' . $e($p->relationship) . '</td>' .
+                    '<td>' . $e($phone) . '</td><td>' . $e($p->email) . '</td></tr>';
+            })->implode('');
 
-                $parentsHtml .= '<tr class="sub-row"><td colspan="4">';
-                $parentsHtml .= '<strong>Occupation:</strong> ' . $e($parent->occupation) . ' &nbsp;·&nbsp; ';
-                $parentsHtml .= '<strong>Position:</strong> ' . $e($parent->position_title) . ' &nbsp;·&nbsp; ';
-                $parentsHtml .= '<strong>Employer:</strong> ' . $e($parent->employer) . ' &nbsp;·&nbsp; ';
-                $parentsHtml .= '<strong>Work Phone:</strong> ' . $e($parent->work_phone);
-                if ($parent->employer_pays_fees) {
-                    $parentsHtml .= ' &nbsp;·&nbsp; <strong>Employer pays fees:</strong> '
-                        . $e($parent->employer_payment_percentage) . '%';
-                }
-                $parentsHtml .= '</td></tr>';
+        $docsHtml = $application->documents->isEmpty()
+            ? '<tr><td colspan="7" class="empty">No documents.</td></tr>'
+            : $application->documents->map(function ($d) use ($e, $docLabels, $fmtDT) {
+                $label = $docLabels[$d->document_type] ?? $d->document_type;
+                $size = $d->file_size ? number_format($d->file_size / 1024, 1) . ' KB' : '—';
+                return '<tr><td>' . $e($label) . '</td><td>' . $e($d->original_name) . '</td>' .
+                    '<td>' . $e($size) . '</td><td>' . $e(ucfirst($d->verification_status ?? 'pending')) . '</td>' .
+                    '<td>' . ($d->physical_received ? 'Yes' : 'No') . '</td><td>' . $e($d->verifiedBy?->name) . '</td>' .
+                    '<td>' . $e($fmtDT($d->verified_at)) . '</td></tr>';
+            })->implode('');
 
-                if ($parent->work_address) {
-                    $parentsHtml .= '<tr class="sub-row"><td colspan="4">'
-                        . '<strong>Work Address:</strong> ' . $e($parent->work_address)
-                        . '</td></tr>';
-                }
-            }
-        }
+        $assessHtml = $application->assessments->isEmpty()
+            ? '<p class="empty">No assessments.</p>'
+            : $application->assessments->map(function ($a) use ($fmtDate, $rows) {
+                return '<div class="assessment-block"><table class="data">' . $rows([
+                    'Type' => $a->assessment_type ?: 'Assessment',
+                    'Date' => $fmtDate($a->assessment_date),
+                    'Time' => $a->assessment_time,
+                    'Location' => $a->location,
+                    'Assessor' => $a->assessor?->name,
+                    'Result' => $a->result ? ucfirst(str_replace('_', ' ', $a->result)) : null,
+                    'Comments' => $a->comments,
+                    'Recommendation' => $a->recommendation,
+                ]) . '</table></div>';
+            })->implode('');
 
-        $documentsHtml = '';
-        if ($application->documents->isEmpty()) {
-            $documentsHtml = '<tr><td colspan="7" class="empty">No documents uploaded.</td></tr>';
-        } else {
-            foreach ($application->documents as $doc) {
-                $label = $docLabels[$doc->document_type] ?? $doc->document_type;
-                $size = $doc->file_size ? number_format($doc->file_size / 1024, 1) . ' KB' : '—';
-                $status = ucfirst($doc->verification_status ?? 'pending');
-                $physical = $doc->physical_received ? 'Yes' : 'No';
-                $verifiedByName = $doc->verifiedBy ? $doc->verifiedBy->name : null;
+        $decisionsHtml = $application->decisions->isEmpty()
+            ? '<p class="empty">No decision.</p>'
+            : $application->decisions->map(function ($d) use ($fmtDT, $rows) {
+                return '<table class="data">' . $rows([
+                    'Decision' => ucfirst($d->decision),
+                    'Decision Date' => $fmtDT($d->decision_date),
+                    'Decided By' => $d->decidedBy?->name,
+                    'Approved Class' => $d->approvedClass?->name,
+                    'House' => $d->house?->name,
+                    'Academic Year' => $d->academicYear?->name,
+                    'Comments' => $d->comments,
+                ]) . '</table>';
+            })->implode('');
 
-                $documentsHtml .= '<tr>';
-                $documentsHtml .= '<td>' . $e($label) . '</td>';
-                $documentsHtml .= '<td>' . $e($doc->original_name) . '</td>';
-                $documentsHtml .= '<td>' . $e($size) . '</td>';
-                $documentsHtml .= '<td>' . $e($status) . '</td>';
-                $documentsHtml .= '<td>' . $e($physical) . '</td>';
-                $documentsHtml .= '<td>' . $e($verifiedByName) . '</td>';
-                $documentsHtml .= '<td>' . $e($fmtDateTime($doc->verified_at)) . '</td>';
-                $documentsHtml .= '</tr>';
-            }
-        }
-
-        $assessmentsHtml = '';
-        if ($application->assessments->isEmpty()) {
-            $assessmentsHtml = '<p class="empty">No assessments scheduled.</p>';
-        } else {
-            foreach ($application->assessments as $assessment) {
-                $resultLabel = $assessment->result
-                    ? ucfirst(str_replace('_', ' ', $assessment->result)) : null;
-                $assessorName = $assessment->assessor ? $assessment->assessor->name : null;
-
-                $assessmentsHtml .= '<div class="assessment-block">';
-                $assessmentsHtml .= '<table class="data">';
-                $assessmentsHtml .= $renderRows([
-                    'Type' => $assessment->assessment_type ?: 'Assessment',
-                    'Date' => $fmtDate($assessment->assessment_date),
-                    'Time' => $assessment->assessment_time,
-                    'Location' => $assessment->location,
-                    'Assessor' => $assessorName,
-                    'Result' => $resultLabel,
-                    'Comments' => $assessment->comments,
-                    'Recommendation' => $assessment->recommendation,
-                ]);
-                $assessmentsHtml .= '</table>';
-                $assessmentsHtml .= '</div>';
-            }
-        }
-
-        $decisionsHtml = '';
-        if ($application->decisions->isEmpty()) {
-            $decisionsHtml = '<p class="empty">No decision recorded.</p>';
-        } else {
-            foreach ($application->decisions as $decision) {
-                $decisionsHtml .= '<table class="data">';
-                $decisionsHtml .= $renderRows([
-                    'Decision' => ucfirst($decision->decision),
-                    'Decision Date' => $fmtDateTime($decision->decision_date),
-                    'Decided By' => $decision->decidedBy?->name,
-                    'Approved Class' => $decision->approvedClass?->name,
-                    'House' => $decision->house?->name,
-                    'Academic Year' => $decision->academicYear?->name,
-                    'Comments' => $decision->comments,
-                    'Principal Comments' => $decision->principal_comments,
-                ]);
-                $decisionsHtml .= '</table>';
-            }
-        }
-
-        $studentRecordSection = '';
+        $studentRecord = '';
         if ($application->student) {
-            $student = $application->student;
-            $studentRecordRows = $renderRows([
-                'Student Number' => $student->student_number,
-                'Current Class' => $student->currentClass?->name,
-                'House' => $student->house?->name,
-                'Academic Year' => $student->academicYear?->name,
-                'Admission Date' => $fmtDate($student->admission_date),
-                'Status' => $student->status,
+            $s = $application->student;
+            $rowsHtml = $rows([
+                'Student Number' => $s->student_number,
+                'Current Class' => $s->currentClass?->name,
+                'Section / Stream' => $s->currentClassStream?->name,
+                'House' => $s->house?->name,
+                'Academic Year' => $s->academicYear?->name,
+                'Admission Date' => $fmtDate($s->admission_date),
+                'Status' => $s->status,
             ]);
-            $studentRecordSection = '<h2 class="section">Enrolled Student Record</h2>'
-                . '<table class="data">' . $studentRecordRows . '</table>';
+            $studentRecord = '<h2 class="section">Enrolled Student Record</h2><table class="data">' . $rowsHtml . '</table>';
         }
 
         return <<<HTML
@@ -1389,7 +1302,7 @@ class AdminAdmissionController extends Controller
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Application {$appNumberDisplay}</title>
+<title>Application {$appNum}</title>
 <style>
   * { box-sizing: border-box; }
   @page { margin: 14mm 12mm; }
@@ -1416,7 +1329,6 @@ class AdminAdmissionController extends Controller
   table th, table td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; font-size: 11px; }
   table th { background: #f5f5f5; font-weight: 700; color: #333; }
   table.data th { width: 28%; }
-  .sub-row td { background: #fafafa; font-size: 10px; color: #475569; }
   .empty { text-align: center; color: #94a3b8; font-style: italic; }
   .assessment-block { margin-bottom: 12px; page-break-inside: avoid; }
   .footer { margin-top: 32px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 10px; color: #888; display: flex; justify-content: space-between; }
@@ -1428,82 +1340,61 @@ class AdminAdmissionController extends Controller
 <div class="content">
   <div class="header">
     <div class="brand">
-      {$headerLogoHtml}
-      <div class="brand-text">
-        <h1>Mount View International</h1>
-        <p>Primary School &amp; Early Years Centre · Admission Application</p>
-      </div>
+      {$logoHtml}
+      <div class="brand-text"><h1>Mount View International</h1><p>Primary School · Admission Application</p></div>
     </div>
-    <div class="ref">
-      Application Number
-      <strong>{$appNumberDisplay}</strong>
-      Submitted: {$submittedAtDisplay}
-    </div>
+    <div class="ref">Application Number<strong>{$appNum}</strong>Submitted: {$submittedAt}</div>
   </div>
 
   <div class="summary">
     {$photoHtml}
     <div class="summary-meta">
-      <h2>{$fullNameEsc}</h2>
+      <h2>{$e($fullName)}</h2>
       <div class="summary-grid">
         <div><strong>Status</strong>{$statusLabel}</div>
-        <div><strong>Class Applied For</strong>{$classAppliedDisplay}</div>
-        <div><strong>Academic Year</strong>{$academicYearDisplay}</div>
-        <div><strong>Source</strong>{$sourceLabel}</div>
-        <div><strong>Physical File</strong>{$physicalFileLabel}</div>
-        <div><strong>Submitted</strong>{$submittedAtDisplay}</div>
+        <div><strong>Class Applied For</strong>{$e($classApplied)}</div>
+        <div><strong>Academic Year</strong>{$e($academicYear)}</div>
+        <div><strong>Submitted</strong>{$submittedAt}</div>
       </div>
     </div>
   </div>
 
   <h2 class="section">Student Information</h2>
-  <table class="data">{$studentDetailsRows}</table>
+  <table class="data">{$studentRows}</table>
 
   <h2 class="section">Medical Information</h2>
   <table class="data">{$medicalRows}</table>
 
   <h2 class="section">Parents / Guardians</h2>
   <table>
-    <thead><tr>
-      <th style="width:28%">Full Name</th>
-      <th style="width:22%">Relationship</th>
-      <th style="width:24%">Phone</th>
-      <th style="width:26%">Email</th>
-    </tr></thead>
+    <thead><tr><th style="width:28%">Full Name</th><th style="width:22%">Relationship</th><th style="width:24%">Phone</th><th style="width:26%">Email</th></tr></thead>
     <tbody>{$parentsHtml}</tbody>
   </table>
 
   <h2 class="section">Previous School</h2>
-  <table class="data">{$previousSchoolRows}</table>
+  <table class="data">{$prevSchoolRows}</table>
 
-  <h2 class="section">Uploaded Documents</h2>
+  <h2 class="section">Documents</h2>
   <table>
     <thead><tr>
-      <th style="width:26%">Document</th>
-      <th style="width:20%">Original File</th>
-      <th style="width:9%">Size</th>
-      <th style="width:11%">Status</th>
-      <th style="width:10%">Physical</th>
-      <th style="width:12%">Verified By</th>
-      <th style="width:12%">Verified At</th>
+      <th style="width:26%">Document</th><th style="width:20%">File</th><th style="width:9%">Size</th>
+      <th style="width:11%">Status</th><th style="width:10%">Physical</th>
+      <th style="width:12%">Verified By</th><th style="width:12%">Verified At</th>
     </tr></thead>
-    <tbody>{$documentsHtml}</tbody>
+    <tbody>{$docsHtml}</tbody>
   </table>
 
   <h2 class="section">Assessments</h2>
-  {$assessmentsHtml}
+  {$assessHtml}
 
   <h2 class="section">Admission Decision</h2>
   {$decisionsHtml}
 
-  <h2 class="section">Notes</h2>
-  <table class="data">{$notesRows}</table>
-
-  {$studentRecordSection}
+  {$studentRecord}
 
   <div class="footer">
-    <span>Generated on {$generatedAtDisplay}</span>
-    <span>Mount View International Primary School &amp; Early Years Centre</span>
+    <span>Generated on {$generatedAt}</span>
+    <span>Mount View International Primary School</span>
   </div>
 </div>
 <script>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 400); });</script>
@@ -1512,11 +1403,8 @@ class AdminAdmissionController extends Controller
 HTML;
     }
 
-    private function audit(
-        string $action,
-        ?AdmissionApplication $application = null,
-        array $metadata = []
-    ): void {
+    private function audit(string $action, ?AdmissionApplication $application = null, array $metadata = []): void
+    {
         AuditLog::create([
             'user_id' => request()->user()?->id,
             'action' => $action,

@@ -90,14 +90,12 @@ export default function Footer() {
               steps.
             </p>
 
-            {/* BRAND TAGLINE */}
             <div className="mt-7 border-l-4 border-[#F58220] pl-4">
               <p className="font-bold text-[#FFE900]">
                 Fostering growth, excellence and empathy.
               </p>
             </div>
 
-            {/* QUICK SUBSCRIBE SHORTCUT */}
             <Link
               href="/newsletters"
               className="mt-7 inline-flex items-center gap-2 text-sm font-bold text-[#FFE900] transition hover:text-white"
@@ -156,7 +154,6 @@ export default function Footer() {
             <h3 className="text-lg font-bold text-[#FFE900]">Contact Us</h3>
 
             <div className="mt-5 space-y-4 text-sm">
-              {/* LOCATION */}
               <a
                 href="https://www.google.com/maps/place/Mount+View+International+Primary+School+and+Early+Years+Centre/@-15.7960625,35.0714375,17z"
                 target="_blank"
@@ -173,7 +170,6 @@ export default function Footer() {
                 </span>
               </a>
 
-              {/* PHONE */}
               <a
                 href="tel:+265881668001"
                 className="flex items-center gap-3 text-blue-100 transition hover:text-white"
@@ -182,7 +178,6 @@ export default function Footer() {
                 <span>0881 668 001</span>
               </a>
 
-              {/* EMAIL */}
               <a
                 href="mailto:info@mountviewmw.com"
                 className="flex items-start gap-3 break-all text-blue-100 transition hover:text-white"
@@ -198,6 +193,55 @@ export default function Footer() {
             >
               Get in Touch
             </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================
+          PARENT PORTAL CTA
+      ========================================================== */}
+      <div className="border-t border-white/10 bg-[#1f2458]">
+        <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+            <div className="text-center sm:text-left">
+              <p className="text-sm font-bold text-[#FFE900]">
+                Already a Mount View parent?
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-blue-200">
+                Sign in to the Parent Portal to view your child&apos;s term
+                results, attendance and observations.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Link
+                href="/parent/login"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#F58220] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#d96e12] hover:shadow-lg"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                Parent Login
+              </Link>
+
+              <Link
+                href="/parent/forgot-password"
+                className="inline-flex items-center rounded-full border border-white/25 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-white/10"
+              >
+                Forgot Password
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -230,15 +274,12 @@ export default function Footer() {
             School & Early Years Centre. All rights reserved.
           </p>
 
-          <div className="flex gap-5">
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/about" className="transition hover:text-white">
               About
             </Link>
 
-            <Link
-              href="/admissions"
-              className="transition hover:text-white"
-            >
+            <Link href="/admissions" className="transition hover:text-white">
               Admissions
             </Link>
 
@@ -248,6 +289,13 @@ export default function Footer() {
 
             <Link href="/contact" className="transition hover:text-white">
               Contact
+            </Link>
+
+            <Link
+              href="/parent/login"
+              className="font-semibold text-[#FFE900] transition hover:text-white"
+            >
+              Parent Login
             </Link>
           </div>
         </div>

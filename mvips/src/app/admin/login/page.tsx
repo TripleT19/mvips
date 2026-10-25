@@ -1,8 +1,10 @@
+
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
 import {
   Eye,
   EyeOff,
@@ -12,41 +14,107 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+const ADMIN_TOKEN_KEY = "admin_token";
+const ADMIN_USER_KEY = "admin_user";
+
 export default function AdminLoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  // Verify an existing session before redirecting to the dashboard.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkSession() {
+      const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+
+      if (!token) {
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_URL}/api/admin/dashboard`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            cache: "no-store",
+          }
+        );
+
+        if (response.ok) {
+          router.replace("/admin");
+          return;
+        }
+
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem(ADMIN_TOKEN_KEY);
+          localStorage.removeItem(ADMIN_USER_KEY);
+        }
+
+        if (!cancelled) {
+          setCheckingSession(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setError(
+            "Unable to verify your session. Please try again."
+          );
+          setCheckingSession(false);
+        }
+      }
+    }
+
+    checkSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setError("");
     setIsLoading(true);
 
     const form = new FormData(event.currentTarget);
-
     const email = form.get("email");
     const password = form.get("password");
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/login`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-            remember: rememberMe,
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/api/admin/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          remember: rememberMe,
+        }),
+      });
 
-      const data = await response.json();
+      let data: any = {};
+
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error(
+          "The server returned an invalid response. Please try again."
+        );
+      }
 
       if (!response.ok) {
         const message =
@@ -57,14 +125,26 @@ export default function AdminLoginPage() {
         throw new Error(message);
       }
 
-      localStorage.setItem("admin_token", data.token);
-      localStorage.setItem("admin_user", JSON.stringify(data.user));
+      if (!data?.token) {
+        throw new Error(
+          "Login succeeded but no token was returned. Please contact support."
+        );
+      }
 
-      window.location.href = "/admin";
-    } catch (error) {
+      localStorage.setItem(ADMIN_TOKEN_KEY, data.token);
+
+      if (data.user) {
+        localStorage.setItem(
+          ADMIN_USER_KEY,
+          JSON.stringify(data.user)
+        );
+      }
+
+      router.replace("/admin");
+    } catch (err) {
       setError(
-        error instanceof Error
-          ? error.message
+        err instanceof Error
+          ? err.message
           : "Unable to sign in. Please try again."
       );
     } finally {
@@ -72,17 +152,26 @@ export default function AdminLoginPage() {
     }
   }
 
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F6F7FB]">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#252B68]" />
+          Checking session…
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#F6F7FB]">
       <div className="grid min-h-screen lg:grid-cols-2">
         {/* LEFT BRANDING PANEL */}
         <section className="relative hidden overflow-hidden bg-[#252B68] lg:flex lg:min-h-screen lg:flex-col lg:justify-between">
-          {/* Decorative shapes */}
           <div className="absolute -right-32 -top-32 h-96 w-96 rounded-full bg-[#FFE900]/10" />
           <div className="absolute -bottom-40 -left-40 h-[30rem] w-[30rem] rounded-full bg-[#F58220]/10" />
 
           <div className="relative z-10 flex h-full flex-col justify-between p-10 xl:p-14">
-            {/* Logo */}
             <div>
               <Image
                 src="/logo.jpg"
@@ -94,7 +183,6 @@ export default function AdminLoginPage() {
               />
             </div>
 
-            {/* Main message */}
             <div className="max-w-xl">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm">
                 <ShieldCheck className="h-4 w-4 text-[#FFE900]" />
@@ -103,9 +191,7 @@ export default function AdminLoginPage() {
 
               <h1 className="text-4xl font-bold leading-tight text-white xl:text-5xl">
                 Welcome to the
-                <span className="block text-[#FFE900]">
-                  Mount View
-                </span>
+                <span className="block text-[#FFE900]">Mount View</span>
                 Administration Portal
               </h1>
 
@@ -116,30 +202,20 @@ export default function AdminLoginPage() {
 
               <div className="mt-7 flex flex-wrap gap-3">
                 <div className="rounded-xl bg-white/10 px-4 py-3 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="font-semibold text-[#FFE900]">
-                    1975
-                  </span>{" "}
+                  <span className="font-semibold text-[#FFE900]">1975</span>{" "}
                   Established
                 </div>
 
                 <div className="rounded-xl bg-white/10 px-4 py-3 text-sm text-white/85 backdrop-blur-sm">
-                  <span className="font-semibold text-[#FFE900]">
-                    600+
-                  </span>{" "}
+                  <span className="font-semibold text-[#FFE900]">600+</span>{" "}
                   Students
                 </div>
               </div>
             </div>
 
-            {/* Footer */}
             <div className="flex items-center justify-between gap-6 text-sm text-white/55">
-              <p>
-                Mount View International Primary School
-              </p>
-
-              <p>
-                Fostering growth, excellence and empathy
-              </p>
+              <p>Mount View International Primary School</p>
+              <p>Fostering growth, excellence and empathy</p>
             </div>
           </div>
         </section>
@@ -147,7 +223,6 @@ export default function AdminLoginPage() {
         {/* RIGHT LOGIN PANEL */}
         <section className="flex min-h-screen items-center justify-center px-5 py-6 sm:px-8 lg:px-12 xl:px-16">
           <div className="w-full max-w-md">
-            {/* Mobile branding */}
             <div className="mb-6 flex flex-col items-center text-center lg:hidden">
               <Image
                 src="/logo.jpg"
@@ -167,9 +242,7 @@ export default function AdminLoginPage() {
               </p>
             </div>
 
-            {/* Login card */}
             <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-xl sm:p-8">
-              {/* Header */}
               <div className="mb-6">
                 <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#252B68]/10">
                   <LockKeyhole className="h-5 w-5 text-[#252B68]" />
@@ -184,16 +257,13 @@ export default function AdminLoginPage() {
                 </p>
               </div>
 
-              {/* Error */}
               {error && (
                 <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Email */}
                 <div>
                   <label
                     htmlFor="email"
@@ -217,7 +287,6 @@ export default function AdminLoginPage() {
                   </div>
                 </div>
 
-                {/* Password */}
                 <div>
                   <label
                     htmlFor="password"
@@ -241,13 +310,9 @@ export default function AdminLoginPage() {
 
                     <button
                       type="button"
-                      onClick={() =>
-                        setShowPassword((current) => !current)
-                      }
+                      onClick={() => setShowPassword((c) => !c)}
                       aria-label={
-                        showPassword
-                          ? "Hide password"
-                          : "Show password"
+                        showPassword ? "Hide password" : "Show password"
                       }
                       className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-[#252B68]"
                     >
@@ -260,15 +325,12 @@ export default function AdminLoginPage() {
                   </div>
                 </div>
 
-                {/* Remember me */}
                 <div className="flex items-center justify-between pt-1">
                   <label className="flex cursor-pointer items-center gap-2">
                     <input
                       type="checkbox"
                       checked={rememberMe}
-                      onChange={(event) =>
-                        setRememberMe(event.target.checked)
-                      }
+                      onChange={(e) => setRememberMe(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-[#252B68] focus:ring-[#252B68]"
                     />
 
@@ -278,7 +340,6 @@ export default function AdminLoginPage() {
                   </label>
                 </div>
 
-                {/* Submit */}
                 <button
                   type="submit"
                   disabled={isLoading}
@@ -295,7 +356,6 @@ export default function AdminLoginPage() {
                 </button>
               </form>
 
-              {/* Security notice */}
               <div className="mt-5 flex gap-3 rounded-xl bg-[#F6F7FB] p-3.5">
                 <ShieldCheck className="mt-0.5 h-4.5 w-4.5 shrink-0 text-[#252B68]" />
 
@@ -305,7 +365,6 @@ export default function AdminLoginPage() {
                 </p>
               </div>
 
-              {/* Back to website */}
               <div className="mt-5 border-t border-gray-100 pt-5 text-center">
                 <Link
                   href="/"
@@ -317,10 +376,9 @@ export default function AdminLoginPage() {
               </div>
             </div>
 
-            {/* Small-screen footer */}
             <p className="mt-5 text-center text-xs text-gray-400 lg:hidden">
-              © {new Date().getFullYear()} Mount View International
-              Primary School & Early Years Centre
+              © {new Date().getFullYear()} Mount View International Primary
+              School & Early Years Centre
             </p>
           </div>
         </section>
@@ -328,4 +386,3 @@ export default function AdminLoginPage() {
     </main>
   );
 }
-
