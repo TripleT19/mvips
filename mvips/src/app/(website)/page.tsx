@@ -107,28 +107,34 @@ function formatEventDate(value: string | null | undefined): string {
    STATIC BRAND CONTENT
 ========================================================= */
 
-const highlights = [
+/* ---------------------------------------------------------
+   STAGES — Early Years, Key Stage 1, Key Stage 2
+   --------------------------------------------------------- */
+const stageHighlights = [
   {
     number: "01",
     title: "Early Years",
+    years: "Ages 3–5",
     description:
-      "A warm and engaging start where children can develop confidence, curiosity and positive attitudes towards learning.",
+      "A warm and engaging foundation where children build confidence, curiosity and positive attitudes towards learning through play, exploration and meaningful experiences.",
     image: "/images/school-life.jpg",
-    href: "/admissions",
+    href: "/academics",
   },
   {
     number: "02",
-    title: "Primary Learning",
+    title: "Key Stage 1",
+    years: "Years 1 & 2 · Ages 5–7",
     description:
-      "Building strong foundations while encouraging learners to think, communicate, investigate and apply what they know.",
-    image: "/images/steam-learning.jpg",
+      "Building strong foundations in reading, writing and mathematics while nurturing creativity, communication and a genuine love of learning.",
+    image: "/images/creative-arts.jpg",
     href: "/academics",
   },
   {
     number: "03",
-    title: "Future Skills",
+    title: "Key Stage 2",
+    years: "Years 3 – 6 · Ages 7–11",
     description:
-      "Developing creativity, digital confidence, research skills, collaboration and independent learning.",
+      "Developing independent, confident learners with deeper knowledge, critical thinking, research skills and the resilience to embrace new challenges.",
     image: "/images/ict.JPG",
     href: "/academics",
   },
@@ -150,14 +156,14 @@ const learningAreas = [
   {
     title: "Research",
     description:
-      "Year 6 learners develop structured research skills and apply them to assignments across different subject areas.",
+      "Learners develop structured research skills and apply them to assignments across different subject areas.",
     icon: "⌕",
   },
   {
-    title: "STEAM",
+    title: "Clubs",
     description:
-      "Opportunities to connect science, technology, engineering, arts and mathematics through practical learning.",
-    icon: "✦",
+      "A broad programme of after-school and lunchtime clubs — sports, arts, coding, chess, reading, music and more — where learners pursue interests and develop new skills.",
+    icon: "◈",
   },
   {
     title: "Sports & Swimming",
@@ -299,7 +305,7 @@ export default async function Home() {
                 href="/admissions"
                 className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-7 py-4 font-black text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
               >
-                Explore Admissions
+                Apply for Admission
                 <span className="ml-2">→</span>
               </Link>
 
@@ -327,23 +333,15 @@ export default async function Home() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">2</p>
-                <p className="mt-1 text-xs font-semibold text-blue-100">
-                  Learning Stages
+                <p className="text-2xl font-black text-[#FFE900]">3</p>
+                <p className="mt-1 text-[11px] font-semibold leading-tight text-blue-100">
+                  Early Years · KS1 · KS2
                 </p>
               </div>
             </div>
           </div>
 
-          {/* ============================================================
-              HERO IMAGE — ADVERTISING STYLE
-              • Outer wrapper is `relative isolate` so children get a
-                fresh stacking context and nothing is pushed behind.
-              • Image sits at the base with no competing stacking context.
-              • Every text/badge layer uses an explicit z-10 / z-20.
-              • Ribbons float on the RIGHT edge (or outer edges) so they
-                never cover the hero text on the left on desktop.
-          ============================================================ */}
+          {/* HERO IMAGE — ADVERTISING STYLE */}
           <div className="order-1 lg:order-2">
             <div className="relative isolate">
               {/* Glow behind the frame */}
@@ -365,7 +363,7 @@ export default async function Home() {
                   {/* Top-left badge */}
                   <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#F58220]" />
-                    Now accepting applications
+                    Applications open for 2026
                   </div>
 
                   {/* Top-right badge */}
@@ -395,7 +393,7 @@ export default async function Home() {
                           href="/admissions"
                           className="inline-flex items-center gap-2 rounded-full bg-[#F58220] px-4 py-2 text-xs font-black text-white transition hover:bg-[#d96e12]"
                         >
-                          Apply Now
+                          Apply for Admission
                           <span>→</span>
                         </Link>
 
@@ -411,11 +409,7 @@ export default async function Home() {
                 </div>
               </div>
 
-              {/* ===================================================
-                  Floating promo ribbon — pinned to the RIGHT edge,
-                  only on large screens so it never overlaps the hero
-                  text on the left.
-              ==================================================== */}
+              {/* Floating promo ribbon — right edge, desktop only */}
               <div className="absolute -right-3 top-1/3 z-20 hidden -translate-y-1/2 rotate-[6deg] rounded-xl bg-[#F58220] px-4 py-3 shadow-2xl lg:block">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/85">
                   Enrolling
@@ -425,9 +419,7 @@ export default async function Home() {
                 </p>
               </div>
 
-              {/* ===================================================
-                  Trust badge — bottom-right, well below the ribbon.
-              ==================================================== */}
+              {/* Trust badge — bottom-right */}
               <div className="absolute -bottom-5 -right-3 z-20 hidden items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl lg:flex">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68] text-lg text-[#FFE900]">
                   ♡
@@ -519,13 +511,13 @@ export default async function Home() {
             </div>
 
             <div className="rounded-3xl bg-[#FFE900] p-7 text-center shadow-sm">
-              <p className="text-4xl font-black text-[#252B68]">2</p>
+              <p className="text-4xl font-black text-[#252B68]">3</p>
               <p className="mt-2 font-bold text-[#252B68]">
-                Early Years & Primary
+                Early Years, KS1 & KS2
               </p>
               <p className="mt-3 text-sm leading-6 text-[#252B68]/70">
-                Supporting children across their early learning and primary
-                school journey.
+                Supporting children through every stage of their primary school
+                journey — Early Years, Key Stage 1 and Key Stage 2.
               </p>
             </div>
           </div>
@@ -533,13 +525,13 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          THREE HIGHLIGHTS
+          THREE HIGHLIGHTS — EARLY YEARS, KS1, KS2
       ========================================================== */}
       <section className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
-              The Mount View Experience
+              Our Stages
             </p>
 
             <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
@@ -547,14 +539,14 @@ export default async function Home() {
             </h2>
 
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              From Early Years through primary education, we aim to provide
-              opportunities for children to learn, explore, create and develop
-              confidence.
+              From the first steps in Early Years to confident learners in Key
+              Stage 2, every stage of the Mount View journey is designed around
+              what children need to flourish.
             </p>
           </div>
 
           <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {highlights.map((item) => (
+            {stageHighlights.map((item) => (
               <article
                 key={item.number}
                 className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-xl"
@@ -568,6 +560,9 @@ export default async function Home() {
                   <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
                   <span className="absolute left-4 top-4 z-20 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-md">
                     {item.number}
+                  </span>
+                  <span className="absolute right-4 top-4 z-20 inline-flex items-center rounded-full bg-black/45 px-3 py-1 text-[11px] font-black text-white backdrop-blur-md">
+                    {item.years}
                   </span>
                 </div>
 
@@ -584,7 +579,7 @@ export default async function Home() {
                     href={item.href}
                     className="mt-5 inline-flex font-bold text-[#252B68] transition hover:text-[#F58220]"
                   >
-                    Discover more
+                    Discover this stage
                     <span className="ml-2 transition group-hover:translate-x-1">
                       →
                     </span>
@@ -610,7 +605,6 @@ export default async function Home() {
               />
             </div>
 
-            {/* Values badge — z-20 so it's always in front of the image */}
             <div className="absolute -bottom-6 -right-3 z-20 rounded-2xl bg-[#FFE900] px-5 py-4 shadow-2xl sm:-right-7">
               <p className="text-xs font-black uppercase tracking-wider text-[#252B68]">
                 Our values
@@ -669,7 +663,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          LEARNING AREAS
+          LEARNING AREAS — Clubs replaces STEAM
       ========================================================== */}
       <section className="bg-[#252B68] py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -721,7 +715,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          ICT / STEAM FEATURE
+          ICT / DIGITAL LEARNING FEATURE
       ========================================================== */}
       <section className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -778,12 +772,11 @@ export default async function Home() {
               <div className="overflow-hidden rounded-[2rem] shadow-2xl">
                 <ImageWithFallback
                   src="/images/ict.JPG"
-                  alt="Learners participating in STEAM activities"
+                  alt="Learners using technology in the classroom"
                   className="aspect-[4/3] w-full"
                 />
               </div>
 
-              {/* Floating CTA badge — z-20 keeps it in front of the image */}
               <div className="absolute -bottom-6 -left-4 z-20 max-w-xs rounded-2xl bg-[#F58220] p-5 text-white shadow-2xl sm:-left-8">
                 <p className="text-xs font-black uppercase tracking-wider text-white/75">
                   Learning by doing
@@ -884,12 +877,11 @@ export default async function Home() {
                   "Sports",
                   "Swimming",
                   "ICT",
-                  "STEAM",
+                  "Clubs",
                   "Arts",
                   "Music",
                   "Dance",
                   "Drama",
-                  "Clubs",
                   "Competitions",
                 ].map((item) => (
                   <span
@@ -1149,7 +1141,7 @@ export default async function Home() {
       )}
 
       {/* =========================================================
-          ADMISSIONS CTA
+          ADMISSIONS CTA — clear application intent
       ========================================================== */}
       <section className="relative overflow-hidden bg-[#252B68] py-20 sm:py-24">
         <div className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F58220]/10" />
@@ -1159,17 +1151,18 @@ export default async function Home() {
           <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.2em] text-[#FFE900]">
-                Your Child's Journey Starts Here
+                Application for Admission
               </p>
 
               <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-                Looking for a school where your child can grow?
+                Ready to apply for a place at Mount View?
               </h2>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100">
-                Discover Mount View International Primary School & Early Years
-                Centre and learn more about our learning approach, school life
-                and admissions journey.
+                Start your child&apos;s application for admission to Mount View
+                International Primary School & Early Years Centre. Our
+                admissions team will guide you through the process from first
+                enquiry to your child&apos;s first day.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -1177,7 +1170,7 @@ export default async function Home() {
                   href="/admissions"
                   className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white transition hover:bg-[#d96e12] hover:shadow-lg"
                 >
-                  Explore Admissions
+                  Apply for Admission
                   <span className="ml-2">→</span>
                 </Link>
 
@@ -1319,8 +1312,8 @@ export default async function Home() {
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/90">
-            Explore our school, discover our approach to learning and take the
-            next step towards your child's Mount View journey.
+            Apply for admission to Mount View and take the next step in your
+            child&apos;s learning journey with us.
           </p>
 
           <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
@@ -1328,7 +1321,7 @@ export default async function Home() {
               href="/admissions"
               className="rounded-full bg-[#252B68] px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#171B4A]"
             >
-              Start Your Enquiry →
+              Apply for Admission →
             </Link>
 
             <Link

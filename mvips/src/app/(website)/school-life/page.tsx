@@ -87,12 +87,6 @@ function resolveImageUrl(url: string | null | undefined): string {
 
 /* =========================================================
    IMAGE POOL & MATCHING
-   ---------------------------------------------------------
-   Build a pool of every image the backend currently has
-   (galleries, events, stories) tagged with its title,
-   description and class name. Slots on this page then pick
-   the best match by keyword; if nothing matches, they fall
-   back to the static brand image below.
 ========================================================= */
 
 type ImagePoolItem = {
@@ -198,7 +192,7 @@ const experienceSlots = [
       "fitness",
       "netball",
     ],
-    fallbackImage: "/images/sports.jpg",
+    fallbackImage: "/images/sports.JPG",
   },
   {
     key: "swimming",
@@ -207,7 +201,7 @@ const experienceSlots = [
     icon: "🏊",
     accent: "orange",
     keywords: ["swim", "pool", "water", "aquatic"],
-    fallbackImage: "/images/gallery/school-3.jpg",
+    fallbackImage: "/images/swimming.jpg",
   },
   {
     key: "ict",
@@ -225,42 +219,41 @@ const experienceSlots = [
       "code",
       "programming",
     ],
-    fallbackImage: "/images/ict.jpg",
+    fallbackImage: "/images/ict.JPG",
   },
   {
-    key: "steam",
-    title: "STEAM & Innovation",
-    text: "Children investigate ideas, solve problems, design solutions and explore the exciting connections between science, technology and creativity.",
-    icon: "🚀",
+    key: "clubs",
+    title: "Clubs & Activities",
+    text: "A rich programme of clubs and co-curricular activities gives learners the chance to explore new interests, develop talents and build friendships beyond the classroom.",
+    icon: "🎯",
     accent: "yellow",
     keywords: [
-      "steam",
-      "stem",
-      "science",
-      "robot",
-      "experiment",
-      "laboratory",
-      "lab",
-      "innovation",
+      "club",
+      "activity",
+      "activities",
+      "co-curricular",
+      "chess",
+      "debate",
+      "scouts",
+      "reading club",
+      "cooking",
+      "gardening",
     ],
-    fallbackImage: "/images/steam.jpg",
+    fallbackImage: "/images/gardening.jpg",
   },
   {
     key: "arts",
-    title: "Creative Arts",
-    text: "Art gives learners space to express their imagination, develop creativity and discover new ways of communicating ideas.",
-    icon: "🎨",
-    accent: "orange",
-    keywords: ["art", "paint", "draw", "craft", "creativ", "design"],
-    fallbackImage: "/images/creative-arts.jpg",
-  },
-  {
-    key: "performing",
-    title: "Music, Dance & Drama",
-    text: "Through performance and creative expression, learners develop confidence, communication, teamwork and self-expression.",
+    title: "Creative & Performing Arts",
+    text: "Art, music, dance and drama come together to give learners space to express their imagination, discover new talents and build confidence through creativity and performance.",
     icon: "🎭",
-    accent: "navy",
+    accent: "orange",
     keywords: [
+      "art",
+      "paint",
+      "draw",
+      "craft",
+      "creativ",
+      "design",
       "music",
       "dance",
       "drama",
@@ -270,7 +263,28 @@ const experienceSlots = [
       "concert",
       "choir",
     ],
-    fallbackImage: "/images/gallery/school-4.jpg",
+    fallbackImage: "/images/creative-arts1.jpg",
+  },
+  {
+    key: "trips",
+    title: "Trips & Excursions",
+    text: "Educational visits and excursions extend learning beyond the classroom, connecting lessons to the real world and creating memories that stay with learners for years.",
+    icon: "🚌",
+    accent: "navy",
+    keywords: [
+      "trip",
+      "excursion",
+      "visit",
+      "tour",
+      "outdoor",
+      "field",
+      "journey",
+      "museum",
+      "zoo",
+      "adventure",
+      "travel",
+    ],
+    fallbackImage: "/images/trips.jpg",
   },
 ];
 
@@ -351,14 +365,14 @@ export default async function SchoolLifePage() {
   const heroImage =
     resolveImageUrl(featuredGallery?.cover_image) ||
     resolveImageUrl(pool[0]?.url) ||
-    "/images/gallery/school-1.jpg";
+    "/images/school-1.jpg";
 
   const introImage =
     resolveImageUrl(secondGallery?.cover_image) ||
     resolveImageUrl(
       featuredGallery?.images?.[1]?.image_url ?? featuredGallery?.cover_image
     ) ||
-    "/images/gallery/school-2.jpg";
+    "/images/school-1.jpg";
 
   const experienceImages: Record<
     string,
@@ -376,7 +390,7 @@ export default async function SchoolLifePage() {
   const featureStripImage = findImage(
     pool,
     ["steam", "stem", "science", "robot", "ict", "technolog", "innovation"],
-    "/images/steam.jpg"
+    "/images/steam-learning.jpg"
   );
 
   const teamSpiritImage = findImage(
@@ -390,7 +404,7 @@ export default async function SchoolLifePage() {
       "house",
       "athletic",
     ],
-    "/images/competitions.jpg"
+    "/images/team-spirit.JPG"
   );
 
   /* Gallery preview grid — actual images from the latest gallery,
@@ -418,7 +432,7 @@ export default async function SchoolLifePage() {
     }
   }
   while (galleryPreviewImages.length < 4) {
-    galleryPreviewImages.push("/images/gallery/school-1.jpg");
+    galleryPreviewImages.push("/images/school-1.jpg");
   }
 
   return (

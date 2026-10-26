@@ -18,7 +18,7 @@ const coreSubjects = [
       "Real-life mathematical thinking",
     ],
     icon: "∑",
-    image: "/images/steam-learning.jpg",
+    image: "/images/mathematics.jpg",
     href: "/admissions",
   },
   {
@@ -34,7 +34,7 @@ const coreSubjects = [
       "Grammar, spelling & phonics",
     ],
     icon: "Aa",
-    image: "/images/school-life.jpg",
+    image: "/images/english.jpg",
     href: "/admissions",
   },
   {
@@ -50,7 +50,7 @@ const coreSubjects = [
       "Recording & explaining findings",
     ],
     icon: "⚗",
-    image: "/images/creative-arts.jpg",
+    image: "/images/science.jpg",
     href: "/admissions",
   },
 ];
@@ -236,41 +236,31 @@ export default function AcademicsPage() {
           </div>
 
           {/* ============================================================
-              ADVERTISING HERO IMAGE
-              • Outer wrapper `relative isolate` creates a fresh stacking
-                context so nothing competes with the overlays.
-              • Every text/badge layer has an explicit z-10 / z-20.
-              • Gradients have pointer-events-none.
-              • Ribbons stay on the outer edges so nothing covers the
-                text column next to the image.
+              HERO IMAGE — reliable aspect-ratio wrapper + absolute fill
           ============================================================ */}
           <div className="order-1 lg:order-2">
             <div className="relative isolate">
               <div className="pointer-events-none absolute -inset-3 z-0 rounded-[2.5rem] bg-[#FFE900]/15 blur-2xl" />
 
               <div className="relative z-10 overflow-hidden rounded-[2rem] border-[10px] border-white/10 bg-[#171B4A] shadow-2xl ring-1 ring-white/10">
-                <div className="relative">
+                <div className="relative aspect-[4/5] w-full sm:aspect-[4/3]">
                   <ImageWithFallback
                     src="/images/steam-learning.jpg"
                     alt="Learners engaged in active learning at Mount View"
-                    className="aspect-[4/5] w-full sm:aspect-[4/3]"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
 
-                  {/* Gradient overlay above image */}
                   <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/55 to-transparent" />
 
-                  {/* Top badge */}
                   <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#F58220]" />
                     Curriculum 2024/25
                   </div>
 
-                  {/* Top-right badge */}
                   <div className="absolute right-4 top-4 z-20 rounded-full border border-white/25 bg-black/35 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white backdrop-blur-md">
                     Core · Creative · Active
                   </div>
 
-                  {/* Bottom promotional panel */}
                   <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
                     <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
                       <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFE900]">
@@ -308,9 +298,6 @@ export default function AcademicsPage() {
                 </div>
               </div>
 
-              {/* Floating ribbon — sits on the RIGHT edge of the image
-                  and only on large screens, so it never overlaps the
-                  text column on the left. */}
               <div className="absolute -right-3 top-1/3 z-20 hidden -translate-y-1/2 rotate-[6deg] rounded-xl bg-[#F58220] px-4 py-3 shadow-2xl lg:block">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/85">
                   Core focus
@@ -320,7 +307,6 @@ export default function AcademicsPage() {
                 </p>
               </div>
 
-              {/* Trust badge — bottom-right, well below the ribbon */}
               <div className="absolute -bottom-5 -right-3 z-20 hidden items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl lg:flex">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68] text-lg text-[#FFE900]">
                   ★
@@ -441,28 +427,32 @@ export default function AcademicsPage() {
                   key={subject.number}
                   className="relative isolate overflow-hidden rounded-[2rem] bg-white shadow-sm ring-1 ring-slate-100 lg:grid lg:grid-cols-2"
                 >
-                  {/* IMAGE SIDE */}
+                  {/* ============================================
+                      IMAGE SIDE
+                      • Mobile: aspect-[4/3] block.
+                      • Desktop: absolutely fills the grid cell
+                        (row height is set by the content side).
+                      • Image is `absolute inset-0 h-full w-full
+                        object-cover` so it always fills its frame.
+                  ============================================ */}
                   <div
-                    className={`relative isolate ${
+                    className={`relative ${
                       isEven ? "lg:order-1" : "lg:order-2"
                     }`}
                   >
-                    <div className="relative">
+                    <div className="relative aspect-[4/3] w-full overflow-hidden lg:absolute lg:inset-0 lg:aspect-auto">
                       <ImageWithFallback
                         src={subject.image}
                         alt={`${subject.title} at Mount View International Primary School`}
-                        className="aspect-[4/3] w-full lg:aspect-auto lg:h-full"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
 
-                      {/* Gradient overlay (in front of image) */}
                       <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E]/80 via-[#0B0F2E]/20 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-transparent lg:to-[#0B0F2E]/40" />
 
-                      {/* Number badge */}
                       <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
                         Core subject · {subject.number}
                       </div>
 
-                      {/* Bottom caption */}
                       <div className="absolute bottom-4 left-4 z-20 hidden lg:block">
                         <div className="rounded-xl border border-white/20 bg-black/40 px-3.5 py-2 backdrop-blur-md">
                           <p className="text-[10px] font-black uppercase tracking-widest text-[#FFE900]">
@@ -568,7 +558,6 @@ export default function AcademicsPage() {
                 key={subject.number}
                 className="group relative isolate overflow-hidden rounded-3xl border border-slate-100 bg-white p-7 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-[#F58220]/30 hover:shadow-xl"
               >
-                {/* Decorative corner */}
                 <div className="pointer-events-none absolute right-0 top-0 h-24 w-24 rounded-bl-[4rem] bg-[#252B68]/5 transition group-hover:bg-[#FFE900]/40" />
 
                 <div className="relative flex items-start justify-between">
@@ -637,7 +626,7 @@ export default function AcademicsPage() {
             {learningStages.map((stage, index) => (
               <div
                 key={stage.number}
-                className="relative isolate rounded-3xl bg-white p-7 shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                className="group relative isolate rounded-3xl bg-white p-7 shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-xl"
               >
                 <span className="text-sm font-black text-[#F58220]">
                   {stage.number}

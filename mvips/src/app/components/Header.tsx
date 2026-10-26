@@ -9,11 +9,7 @@ import { useEffect, useRef, useState } from "react";
 | Navigation config
 ------------------------------------------------------------------ */
 
-type NavLink = {
-  type: "link";
-  name: string;
-  href: string;
-};
+type NavLink = { type: "link"; name: string; href: string };
 
 type NavGroup = {
   type: "group";
@@ -26,7 +22,48 @@ type NavItem = NavLink | NavGroup;
 
 const navigation: NavItem[] = [
   { type: "link", name: "Home", href: "/" },
-  { type: "link", name: "About", href: "/about" },
+  {
+    type: "group",
+    name: "About",
+    matchPrefixes: ["/about"],
+    items: [
+      {
+        name: "School Overview",
+        href: "/about#overview",
+        description: "Who we are and what we stand for",
+      },
+      {
+        name: "Mission & Vision",
+        href: "/about#mission-vision",
+        description: "The purpose that guides our school",
+      },
+      {
+        name: "Founder",
+        href: "/about#founder",
+        description: "The vision that started it all in 1975",
+      },
+      {
+        name: "Governance & Board",
+        href: "/about#board",
+        description: "Board members and our chairman",
+      },
+      {
+        name: "School Leadership",
+        href: "/about#principal",
+        description: "Principal and administration",
+      },
+      {
+        name: "Academic Team",
+        href: "/about#lead-teachers",
+        description: "Curriculum leads, coordinators and class teachers",
+      },
+      {
+        name: "Celebrating Our People",
+        href: "/about#celebrating",
+        description: "10+ years of dedicated service",
+      },
+    ],
+  },
   { type: "link", name: "Academics", href: "/academics" },
   { type: "link", name: "Admissions", href: "/admissions" },
   { type: "link", name: "School Life", href: "/school-life" },
@@ -61,17 +98,30 @@ export default function Header() {
   return (
     <>
       {/* TOP BAR */}
-      <div className="bg-[#252B68] px-4 py-2.5 text-center text-sm text-white">
-        <p className="font-medium">
-          Welcome to Mount View International Primary School & Early Years
-          Centre
-        </p>
+      <div className="bg-[#252B68] px-4 py-2.5 text-sm text-white">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-6 gap-y-1 sm:justify-between">
+          <p className="font-medium">
+            Welcome to Mount View International Primary School & Early Years
+            Centre
+          </p>
+
+          <div className="hidden items-center gap-4 text-xs font-semibold text-blue-100 sm:flex">
+            <span>Lilongwe, Malawi</span>
+            <span className="h-1 w-1 rounded-full bg-[#FFE900]" />
+            <a
+              href="tel:+2651750100"
+              className="transition hover:text-[#FFE900]"
+            >
+              +265 1 750 100
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* MAIN HEADER */}
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-          {/* LOGO + SCHOOL NAME */}
+          {/* LOGO + NAME */}
           <Link
             href="/"
             onClick={() => setMenuOpen(false)}
@@ -101,7 +151,7 @@ export default function Header() {
             </div>
           </Link>
 
-          {/* DESKTOP NAVIGATION */}
+          {/* DESKTOP NAV */}
           <nav
             className="hidden items-center gap-1 lg:flex"
             aria-label="Main navigation"
@@ -109,7 +159,7 @@ export default function Header() {
             {navigation.map((item) =>
               item.type === "link" ? (
                 <DesktopLink
-                  key={item.href}
+                  key={item.name}
                   href={item.href}
                   name={item.name}
                   active={isLinkActive(pathname, item.href)}
@@ -123,7 +173,6 @@ export default function Header() {
               )
             )}
 
-            {/* PARENT LOGIN — secondary CTA */}
             <Link
               href="/parent/login"
               aria-current={pathname === "/parent/login" ? "page" : undefined}
@@ -150,7 +199,6 @@ export default function Header() {
               Parent Login
             </Link>
 
-            {/* CONTACT — primary CTA */}
             <Link
               href="/contact"
               aria-current={pathname === "/contact" ? "page" : undefined}
@@ -164,7 +212,7 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* MOBILE MENU BUTTON */}
+          {/* MOBILE BUTTON */}
           <button
             type="button"
             onClick={() => setMenuOpen((current) => !current)}
@@ -205,7 +253,7 @@ export default function Header() {
           </button>
         </div>
 
-        {/* MOBILE NAVIGATION */}
+        {/* MOBILE NAV */}
         {menuOpen && (
           <div className="border-t border-slate-200 bg-white shadow-lg lg:hidden">
             <nav
@@ -216,7 +264,7 @@ export default function Header() {
                 {navigation.map((item) =>
                   item.type === "link" ? (
                     <MobileLink
-                      key={item.href}
+                      key={item.name}
                       href={item.href}
                       name={item.name}
                       active={isLinkActive(pathname, item.href)}
@@ -284,9 +332,21 @@ export default function Header() {
 | Helpers
 ------------------------------------------------------------------ */
 
+function splitHref(href: string) {
+  const [path, hash = ""] = href.split("#");
+  return { path, hash };
+}
+
 function isLinkActive(pathname: string, href: string) {
-  if (href === "/") return pathname === "/";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  const { path, hash } = splitHref(href);
+  if (hash) return pathname === path;
+  if (path === "/") return pathname === "/";
+  return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+function isNavItemActive(pathname: string, href: string) {
+  if (href.includes("#")) return false;
+  return isLinkActive(pathname, href);
 }
 
 function isGroupActive(pathname: string, prefixes: string[]) {
@@ -319,7 +379,6 @@ function DesktopLink({
       }`}
     >
       {name}
-
       {active && (
         <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#FFE900]" />
       )}
@@ -339,17 +398,15 @@ function DesktopDropdown({
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const active = isGroupActive(pathname, group.matchPrefixes);
+  const isWide = group.items.length > 8;
 
   useEffect(() => {
     if (!open) return;
 
     const onPointerDown = (e: PointerEvent) => {
       if (!containerRef.current) return;
-      if (!containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
     };
-
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
@@ -396,7 +453,6 @@ function DesktopDropdown({
         }`}
       >
         {group.name}
-
         <svg
           width="12"
           height="12"
@@ -413,7 +469,6 @@ function DesktopDropdown({
         >
           <path d="M6 9l6 6 6-6" />
         </svg>
-
         {active && (
           <span className="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-[#FFE900]" />
         )}
@@ -422,47 +477,47 @@ function DesktopDropdown({
       {open && (
         <div
           role="menu"
-          className="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl"
+          className={`absolute top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white py-2 shadow-2xl ${
+            isWide ? "left-0 w-[620px]" : "left-1/2 w-96 -translate-x-1/2"
+          }`}
         >
-          {group.items.map((item) => {
-            const itemActive = isLinkActive(pathname, item.href);
+          <div className={isWide ? "grid grid-cols-2 gap-1 p-2" : "px-2"}>
+            {group.items.map((item) => {
+              const itemActive = isNavItemActive(pathname, item.href);
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                role="menuitem"
-                onClick={() => setOpen(false)}
-                className={`group flex items-start gap-3 px-4 py-3 transition ${
-                  itemActive
-                    ? "bg-[#252B68]/5"
-                    : "hover:bg-slate-50"
-                }`}
-              >
-                <span
-                  className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                    itemActive ? "bg-[#F58220]" : "bg-slate-300"
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={`group flex items-start gap-3 rounded-xl px-3 py-2.5 transition ${
+                    itemActive ? "bg-[#252B68]/5" : "hover:bg-slate-50"
                   }`}
-                />
-
-                <div className="min-w-0">
-                  <p
-                    className={`text-sm font-black ${
-                      itemActive ? "text-[#252B68]" : "text-slate-700"
+                >
+                  <span
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      itemActive ? "bg-[#F58220]" : "bg-slate-300"
                     }`}
-                  >
-                    {item.name}
-                  </p>
-
-                  {item.description && (
-                    <p className="mt-0.5 text-xs leading-5 text-slate-500">
-                      {item.description}
+                  />
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-black ${
+                        itemActive ? "text-[#252B68]" : "text-slate-700"
+                      }`}
+                    >
+                      {item.name}
                     </p>
-                  )}
-                </div>
-              </Link>
-            );
-          })}
+                    {item.description && (
+                      <p className="mt-0.5 text-xs leading-5 text-slate-500">
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
@@ -496,7 +551,6 @@ function MobileLink({
       }`}
     >
       <span>{name}</span>
-
       {active && <span className="h-2 w-2 rounded-full bg-[#FFE900]" />}
     </Link>
   );
@@ -527,7 +581,6 @@ function MobileGroup({
         }`}
       >
         <span>{group.name}</span>
-
         <svg
           width="16"
           height="16"
@@ -549,11 +602,11 @@ function MobileGroup({
       {open && (
         <div className="mt-1 space-y-1 pl-3">
           {group.items.map((item) => {
-            const itemActive = isLinkActive(pathname, item.href);
+            const itemActive = isNavItemActive(pathname, item.href);
 
             return (
               <Link
-                key={item.href}
+                key={item.name}
                 href={item.href}
                 onClick={onNavigate}
                 className={`flex items-center justify-between rounded-xl px-4 py-3 text-sm font-semibold transition ${
@@ -563,7 +616,6 @@ function MobileGroup({
                 }`}
               >
                 <span>{item.name}</span>
-
                 {itemActive && (
                   <span className="h-1.5 w-1.5 rounded-full bg-[#F58220]" />
                 )}
