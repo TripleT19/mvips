@@ -20,7 +20,8 @@ import { useEffect, useMemo, useState } from "react";
 ========================================================= */
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000";
 
 type Newsletter = {
   id: number;
@@ -126,9 +127,11 @@ export default function NewslettersPage() {
           setYears(json.years ?? []);
           setTotal(json.data?.total ?? 0);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(e?.message || "Unable to load newsletters.");
+          const message =
+            e instanceof Error ? e.message : "Unable to load newsletters.";
+          setError(message);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -185,42 +188,112 @@ export default function NewslettersPage() {
 
   return (
     <main className="overflow-hidden bg-white text-[#172033]">
+      {/* ---------- shared animation styles ---------- */}
+      <style>{`
+        @keyframes mv-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(8deg)} }
+        @keyframes mv-float-alt { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(14px) rotate(-8deg)} }
+        @keyframes mv-blob { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(24px,-28px) scale(1.1)} 66%{transform:translate(-20px,18px) scale(.94)} }
+        @keyframes mv-pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+        @keyframes mv-marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+        .mv-float{animation:mv-float 6s ease-in-out infinite}
+        .mv-float-alt{animation:mv-float-alt 7s ease-in-out infinite}
+        .mv-blob{animation:mv-blob 16s ease-in-out infinite}
+        .mv-pop{animation:mv-pop 3.5s ease-in-out infinite}
+        .mv-marquee{animation:mv-marquee 40s linear infinite}
+
+        @media (prefers-reduced-motion: reduce){
+          .mv-float,.mv-float-alt,.mv-blob,.mv-pop,.mv-marquee{animation:none}
+        }
+      `}</style>
+
       {/* =========================================================
           HERO
       ========================================================== */}
       <section className="relative isolate overflow-hidden bg-[#252B68]">
-        <div className="pointer-events-none absolute -right-40 -top-40 z-0 h-[32rem] w-[32rem] rounded-full bg-[#FFE900]/10" />
-        <div className="pointer-events-none absolute -bottom-48 -left-40 z-0 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/10" />
+        {/* decorative blobs */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="mv-blob absolute -right-40 -top-40 z-0 h-[32rem] w-[32rem] rounded-full bg-[#FFE900]/15 blur-3xl" />
+          <div className="mv-blob absolute -bottom-48 -left-40 z-0 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/25 blur-3xl [animation-delay:-6s]" />
+          <div className="absolute left-1/3 top-1/4 h-64 w-64 rounded-full bg-[#4a55b8]/30 blur-3xl" />
+        </div>
+
+        {/* floating emoji cliparts */}
+        <span className="mv-float pointer-events-none absolute left-[4%] top-[20%] z-0 text-4xl opacity-80 sm:text-5xl">
+          📰
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[6%] top-[14%] z-0 text-4xl opacity-80 sm:text-5xl">
+          📄
+        </span>
+        <span className="mv-float pointer-events-none absolute left-[8%] bottom-[14%] z-0 text-3xl opacity-70 sm:text-4xl">
+          ✨
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[10%] bottom-[16%] z-0 text-3xl opacity-70 sm:text-4xl">
+          🎉
+        </span>
+        <span className="mv-pop pointer-events-none absolute left-[55%] top-[8%] hidden text-2xl opacity-60 lg:block">
+          🏆
+        </span>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
             {/* Left: copy */}
             <div>
-              <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFE900]">
+              <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFE900] backdrop-blur">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-[#FFE900]" />
                 Newsletters · Mount View International
               </div>
 
               <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
                 Stay up to date with{" "}
-                <span className="text-[#FFE900]">every term.</span>
+                <span className="relative inline-block text-[#FFE900]">
+                  every term.
+                  <svg
+                    className="absolute -bottom-2 left-0 w-full text-[#F58220]"
+                    viewBox="0 0 300 12"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2 9c60-6 140-8 296-4"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </h1>
 
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
+              <p className="mt-7 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
                 Download our latest newsletters to catch up on school news,
                 events, achievements and everything happening in our
                 community. Subscribe to receive each new edition by email.
               </p>
 
+              <div className="mt-8 flex flex-wrap gap-3">
+                <span className="rounded-full bg-[#F58220] px-5 py-2.5 text-sm font-bold text-white shadow-lg">
+                  School News
+                </span>
+                <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
+                  Achievements
+                </span>
+                <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
+                  Events
+                </span>
+                <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
+                  Community
+                </span>
+              </div>
+
               <div className="mt-9 grid max-w-xl grid-cols-3 gap-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:-translate-y-1 hover:border-[#FFE900]/40 hover:bg-white/10">
                   <p className="text-2xl font-black text-[#FFE900]">{total}</p>
                   <p className="mt-1 text-xs font-semibold text-blue-100">
                     Newsletters
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:-translate-y-1 hover:border-[#FFE900]/40 hover:bg-white/10">
                   <p className="text-2xl font-black text-[#FFE900]">
                     {years.length || "—"}
                   </p>
@@ -229,7 +302,7 @@ export default function NewslettersPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:-translate-y-1 hover:border-[#FFE900]/40 hover:bg-white/10">
                   <p className="text-2xl font-black text-[#FFE900]">PDF</p>
                   <p className="mt-1 text-xs font-semibold text-blue-100">
                     Format
@@ -247,22 +320,62 @@ export default function NewslettersPage() {
       </section>
 
       {/* =========================================================
-          FEATURED
+          MARQUEE STRIP
+      ========================================================== */}
+      <section className="overflow-hidden border-y border-slate-200 bg-white py-4">
+        <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
+          {[
+            "Latest Editions",
+            "Termly Round-Ups",
+            "School News",
+            "Achievements",
+            "Events & Trips",
+            "Community Stories",
+            "Sports Updates",
+            "Creative Arts",
+            "Latest Editions",
+            "Termly Round-Ups",
+            "School News",
+            "Achievements",
+            "Events & Trips",
+            "Community Stories",
+            "Sports Updates",
+            "Creative Arts",
+          ].map((item, i) => (
+            <span
+              key={`${item}-${i}`}
+              className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.2em] text-[#252B68]/70"
+            >
+              <span className="text-[#F58220]">✦</span>
+              {item}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* =========================================================
+          FEATURED EDITION
       ========================================================== */}
       {featured && (
-        <section className="bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-8 text-center">
-              <p className="font-black uppercase tracking-[0.2em] text-[#F58220]">
+        <section className="relative overflow-hidden bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="mv-blob absolute -left-24 top-40 h-72 w-72 rounded-full bg-[#FFE900]/20 blur-3xl" />
+            <div className="mv-blob absolute -right-24 bottom-40 h-72 w-72 rounded-full bg-[#F58220]/15 blur-3xl [animation-delay:-6s]" />
+          </div>
+
+          <div className="relative mx-auto max-w-7xl">
+            <div className="mb-10 text-center">
+              <p className="inline-flex items-center gap-2 rounded-full bg-[#F58220]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                 Latest Edition
               </p>
 
-              <h2 className="mt-3 text-3xl font-black text-[#252B68] sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
                 Fresh off the press.
               </h2>
             </div>
 
-            <div className="relative isolate overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100 lg:grid lg:grid-cols-[0.85fr_1.15fr]">
+            <div className="relative isolate overflow-hidden rounded-[2rem] bg-white shadow-2xl ring-1 ring-slate-100 lg:grid lg:grid-cols-[0.85fr_1.15fr]">
               {/* Cover */}
               <div className="relative isolate">
                 <div className="relative h-full min-h-[320px] w-full">
@@ -331,17 +444,20 @@ export default function NewslettersPage() {
                   <button
                     type="button"
                     onClick={() => setSelected(featured)}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3.5 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#d96e12]"
+                    className="group inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3.5 font-black text-white shadow-lg shadow-[#F58220]/30 transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
                   >
                     View Details
-                    <ArrowRight size={16} />
+                    <ArrowRight
+                      size={16}
+                      className="transition group-hover:translate-x-1"
+                    />
                   </button>
 
                   <a
                     href={`${API_URL}/api/newsletters/${featured.slug}/download`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-full border-2 border-[#252B68]/20 px-6 py-3.5 font-black text-[#252B68] transition hover:border-[#252B68] hover:bg-[#252B68] hover:text-white"
+                    className="inline-flex items-center gap-2 rounded-full border-2 border-[#252B68]/20 px-6 py-3.5 font-black text-[#252B68] transition hover:-translate-y-1 hover:border-[#252B68] hover:bg-[#252B68] hover:text-white"
                   >
                     <Download size={16} />
                     Download PDF
@@ -358,15 +474,28 @@ export default function NewslettersPage() {
       ========================================================== */}
       <section
         id="archive"
-        className="scroll-mt-24 bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+        className="relative scroll-mt-24 overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
       >
-        <div className="mx-auto max-w-7xl">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="mv-blob absolute -left-24 top-40 h-72 w-72 rounded-full bg-[#FFE900]/15 blur-3xl" />
+          <div className="mv-blob absolute -right-24 bottom-40 h-72 w-72 rounded-full bg-[#F58220]/10 blur-3xl [animation-delay:-8s]" />
+        </div>
+
+        <span className="mv-float pointer-events-none absolute left-[4%] top-16 text-5xl opacity-15">
+          📚
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[4%] bottom-16 text-5xl opacity-15">
+          🗂
+        </span>
+
+        <div className="relative mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="font-black uppercase tracking-[0.2em] text-[#F58220]">
+            <p className="inline-flex items-center gap-2 rounded-full bg-[#F58220]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
               Newsletter Archive
             </p>
 
-            <h2 className="mt-3 text-3xl font-black text-[#252B68] sm:text-4xl">
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
               Every edition, one click away.
             </h2>
 
@@ -437,9 +566,10 @@ export default function NewslettersPage() {
               </p>
               <a
                 href="#subscribe"
-                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3 font-black text-white transition hover:bg-[#d96e12]"
+                className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3 font-black text-white transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-lg"
               >
                 Subscribe for Updates
+                <ArrowRight size={16} />
               </a>
             </div>
           )}
@@ -475,7 +605,7 @@ export default function NewslettersPage() {
                       key={newsletter.id}
                       type="button"
                       onClick={() => setSelected(newsletter)}
-                      className="group relative isolate flex flex-col overflow-hidden rounded-3xl bg-white text-left shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
+                      className="group relative isolate flex flex-col overflow-hidden rounded-[2rem] bg-white text-left shadow-lg ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
                     >
                       {/* Cover */}
                       <div className="relative isolate aspect-[16/10] w-full overflow-hidden bg-slate-100">
@@ -538,7 +668,10 @@ export default function NewslettersPage() {
 
                           <div className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#252B68] px-5 py-3 text-sm font-black text-white transition group-hover:bg-[#F58220]">
                             View Details
-                            <ArrowRight size={15} />
+                            <ArrowRight
+                              size={15}
+                              className="transition group-hover:translate-x-1"
+                            />
                           </div>
                         </div>
                       </div>
@@ -551,17 +684,28 @@ export default function NewslettersPage() {
       </section>
 
       {/* =========================================================
-          NEVER MISS
+          NEVER MISS AN EDITION
       ========================================================== */}
       <section
         id="subscribe-section"
-        className="scroll-mt-24 bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+        className="relative scroll-mt-24 overflow-hidden bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
       >
-        <div className="mx-auto max-w-7xl">
-          <div className="rounded-[2rem] bg-[#FFE900] p-8 sm:p-12 lg:p-16">
-            <div className="grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+        <span className="mv-float pointer-events-none absolute left-[6%] top-12 text-5xl opacity-20">
+          📨
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-12 text-5xl opacity-20">
+          🔔
+        </span>
+
+        <div className="relative mx-auto max-w-7xl">
+          <div className="relative overflow-hidden rounded-[2rem] bg-[#FFE900] p-8 shadow-2xl sm:p-12 lg:p-16">
+            <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-white/40 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-[#F58220]/30 blur-3xl" />
+
+            <div className="relative grid items-center gap-10 lg:grid-cols-[1.2fr_0.8fr]">
               <div>
-                <p className="font-black uppercase tracking-[0.2em] text-[#252B68]">
+                <p className="inline-flex items-center gap-2 rounded-full bg-[#252B68]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#252B68]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                   Never Miss an Edition
                 </p>
 
@@ -581,8 +725,10 @@ export default function NewslettersPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-white/70 p-5">
-                  <p className="text-3xl">📨</p>
+                <div className="group rounded-2xl bg-white/70 p-5 transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-lg">
+                  <p className="text-3xl transition group-hover:scale-110">
+                    📨
+                  </p>
                   <p className="mt-3 text-sm font-black text-[#252B68]">
                     Email Delivery
                   </p>
@@ -591,8 +737,10 @@ export default function NewslettersPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/70 p-5">
-                  <p className="text-3xl">📄</p>
+                <div className="group rounded-2xl bg-white/70 p-5 transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-lg">
+                  <p className="text-3xl transition group-hover:scale-110">
+                    📄
+                  </p>
                   <p className="mt-3 text-sm font-black text-[#252B68]">
                     PDF Format
                   </p>
@@ -601,8 +749,10 @@ export default function NewslettersPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/70 p-5">
-                  <p className="text-3xl">🗂</p>
+                <div className="group rounded-2xl bg-white/70 p-5 transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-lg">
+                  <p className="text-3xl transition group-hover:scale-110">
+                    🗂
+                  </p>
                   <p className="mt-3 text-sm font-black text-[#252B68]">
                     Full Archive
                   </p>
@@ -611,8 +761,10 @@ export default function NewslettersPage() {
                   </p>
                 </div>
 
-                <div className="rounded-2xl bg-white/70 p-5">
-                  <p className="text-3xl">🔔</p>
+                <div className="group rounded-2xl bg-white/70 p-5 transition duration-300 hover:-translate-y-1 hover:bg-white hover:shadow-lg">
+                  <p className="text-3xl transition group-hover:scale-110">
+                    🔔
+                  </p>
                   <p className="mt-3 text-sm font-black text-[#252B68]">
                     Stay Informed
                   </p>
@@ -630,13 +782,23 @@ export default function NewslettersPage() {
           ADMISSIONS CTA
       ========================================================== */}
       <section className="relative isolate overflow-hidden bg-[#252B68] py-20 sm:py-24">
-        <div className="pointer-events-none absolute -right-40 -top-40 z-0 h-96 w-96 rounded-full bg-[#F58220]/10" />
-        <div className="pointer-events-none absolute -bottom-40 -left-40 z-0 h-96 w-96 rounded-full bg-[#FFE900]/10" />
+        <div className="pointer-events-none absolute inset-0">
+          <div className="mv-blob absolute -right-40 -top-40 z-0 h-96 w-96 rounded-full bg-[#F58220]/20 blur-3xl" />
+          <div className="mv-blob absolute -bottom-40 -left-40 z-0 h-96 w-96 rounded-full bg-[#FFE900]/15 blur-3xl [animation-delay:-6s]" />
+        </div>
+
+        <span className="mv-float pointer-events-none absolute left-[8%] top-10 text-4xl opacity-30">
+          🎓
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[8%] bottom-10 text-4xl opacity-30">
+          💛
+        </span>
 
         <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
-              <p className="font-black uppercase tracking-[0.2em] text-[#FFE900]">
+              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                 Join Our Community
               </p>
 
@@ -652,15 +814,17 @@ export default function NewslettersPage() {
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/admissions"
-                  className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#d96e12]"
+                  className="group inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
                 >
                   Explore Admissions
-                  <span className="ml-2">→</span>
+                  <span className="ml-2 inline-block transition group-hover:translate-x-1">
+                    →
+                  </span>
                 </Link>
 
                 <Link
                   href="/contact"
-                  className="inline-flex items-center justify-center rounded-full border-2 border-white/30 px-8 py-4 font-bold text-white transition hover:bg-white hover:text-[#252B68]"
+                  className="inline-flex items-center justify-center rounded-full border-2 border-white/30 bg-white/10 px-8 py-4 font-bold text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
                 >
                   Make an Enquiry
                 </Link>
@@ -668,7 +832,7 @@ export default function NewslettersPage() {
             </div>
 
             <div className="rounded-[2rem] border border-white/10 bg-white/5 p-7 backdrop-blur-sm sm:p-9">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-2xl text-[#252B68]">
+              <div className="mv-pop flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-2xl text-[#252B68]">
                 ♡
               </div>
 
@@ -689,12 +853,18 @@ export default function NewslettersPage() {
       {/* =========================================================
           BRAND STRIP
       ========================================================== */}
-      <section className="bg-[#171B4A] px-4 py-10 text-center">
-        <p className="text-lg font-black text-[#FFE900] sm:text-xl">
+      <section className="relative overflow-hidden bg-[#171B4A] px-4 py-10 text-center">
+        <span className="mv-float pointer-events-none absolute left-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
+          ✨
+        </span>
+        <span className="mv-float-alt pointer-events-none absolute right-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
+          📰
+        </span>
+        <p className="relative text-lg font-black text-[#FFE900] sm:text-xl">
           Fostering growth, excellence and empathy.
         </p>
 
-        <p className="mt-2 text-sm text-blue-200">
+        <p className="relative mt-2 text-sm text-blue-200">
           Established in 1975 · Mount View International Primary School & Early
           Years Centre
         </p>
@@ -825,7 +995,7 @@ function NewsletterDetailsModal({
               href={downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#F58220] px-6 py-4 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#d96e12]"
+              className="group inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-[#F58220] px-6 py-4 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-[#d96e12] hover:shadow-xl"
             >
               <Download size={17} />
               Download PDF
@@ -835,7 +1005,7 @@ function NewsletterDetailsModal({
               href={downloadUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border-2 border-[#252B68]/20 px-6 py-4 font-black text-[#252B68] transition hover:border-[#252B68] hover:bg-[#252B68] hover:text-white"
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border-2 border-[#252B68]/20 px-6 py-4 font-black text-[#252B68] transition hover:-translate-y-0.5 hover:border-[#252B68] hover:bg-[#252B68] hover:text-white"
             >
               <FileText size={17} />
               Open in New Tab

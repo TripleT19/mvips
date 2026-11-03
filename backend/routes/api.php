@@ -39,6 +39,8 @@ use App\Http\Controllers\Api\ParentAuthController;
 
 /* ---- Portal meta ---- */
 use App\Http\Controllers\Api\PortalCapabilityController;
+use App\Http\Controllers\Api\AlumniController;
+use App\Http\Controllers\Api\Admin\AdminAlumniController;
 
 /* ---- Finance module (bursar-only) ---- */
 use App\Http\Controllers\Api\SchoolBankAccountController;
@@ -144,6 +146,34 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::get('/children',                          [ParentPortalController::class, 'children']);
         Route::get('/children/{student:slug}/terms',     [ParentPortalController::class, 'terms']);
         Route::get('/children/{student:slug}/results',   [ParentPortalController::class, 'results']);
+    });
+
+/* ============================================================
+ * ALUMNI MODULE
+ * ============================================================ */
+Route::prefix('alumni')->group(function () {
+    Route::get('/',  [AlumniController::class, 'index']);
+    Route::post('/', [AlumniController::class, 'store']);
+});
+
+/* ============================================================
+ * ALUMNI ADMIN MODULE — admin / headteacher only
+ * ------------------------------------------------------------
+ * Requires the `alumni-approver` middleware alias registered
+ * in bootstrap/app.php:
+ *
+ *   $middleware->alias([
+ *       'admin'           => \App\Http\Middleware\AdminMiddleware::class,
+ *       'alumni-approver' => \App\Http\Middleware\AlumniApproverMiddleware::class,
+ *   ]);
+ * ============================================================ */
+Route::middleware(['auth:sanctum', 'admin', 'alumni-approver'])
+    ->prefix('admin/alumni')
+    ->group(function () {
+        Route::get('/',                    [AdminAlumniController::class, 'index']);
+        Route::patch('/{alumnus}/approve', [AdminAlumniController::class, 'approve']);
+        Route::patch('/{alumnus}/reject',  [AdminAlumniController::class, 'reject']);
+        Route::delete('/{alumnus}',        [AdminAlumniController::class, 'destroy']);
     });
 
 /* ============================================================

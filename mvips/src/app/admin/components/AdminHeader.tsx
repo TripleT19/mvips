@@ -25,9 +25,16 @@ type NotificationItem = {
   created_at: string;
   title: string;
   message: string;
+  url: string | null;
+  type: string | null;
+  /* Admissions */
   application_id: number | null;
   application_number: string | null;
-  url: string | null;
+  /* Alumni */
+  alumnus_id: number | null;
+  full_name: string | null;
+  year_left: number | null;
+  current_role: string | null;
 };
 
 export default function AdminHeader({
@@ -142,6 +149,17 @@ export default function AdminHeader({
       }
     }
 
+    /* ─── Alumni notification ─── */
+    const isAlumni =
+      notification.type === "alumni.submitted" ||
+      notification.alumnus_id != null;
+
+    if (isAlumni && notification.alumnus_id) {
+      router.push(`/admin/alumni?expand=${notification.alumnus_id}`);
+      return;
+    }
+
+    /* ─── Admission notification (unchanged) ─── */
     if (notification.application_id) {
       router.push(
         `/admin/admissions?application=${notification.application_id}`
@@ -165,6 +183,10 @@ export default function AdminHeader({
       return value;
     }
   }
+
+  /* Detect alumni notification for badge in list */
+  const isAlumniNotif = (n: NotificationItem) =>
+    n.type === "alumni.submitted" || n.alumnus_id != null;
 
   return (
     <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-4 shadow-sm backdrop-blur sm:px-6 lg:px-8">
@@ -279,9 +301,16 @@ export default function AdminHeader({
                         }`}
                       />
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-[#172033]">
-                          {notification.title}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-bold text-[#172033]">
+                            {notification.title}
+                          </p>
+                          {isAlumniNotif(notification) && (
+                            <span className="shrink-0 rounded-full bg-[#FFE900] px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-[#252B68]">
+                              Alumni
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-1 text-[11px] leading-5 text-slate-600">
                           {notification.message}
                         </p>
@@ -293,6 +322,13 @@ export default function AdminHeader({
                               <ExternalLink size={9} />
                             </span>
                           )}
+                          {isAlumniNotif(notification) &&
+                            notification.year_left && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5">
+                                Class of {notification.year_left}
+                                <ExternalLink size={9} />
+                              </span>
+                            )}
                         </p>
                       </div>
                     </div>

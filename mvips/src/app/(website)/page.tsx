@@ -6,7 +6,8 @@ import ImageWithFallback from "../components/ImageWithFallback";
 ========================================================= */
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000";
 
 type Story = {
   id: number;
@@ -50,37 +51,81 @@ type GalleryItem = {
   images: GalleryImage[];
 };
 
-async function fetchJson<T>(path: string): Promise<T | null> {
+/* ---------------------------------------------------------
+   Robust array extractor
+--------------------------------------------------------- */
+function extractArray<T = unknown>(payload: unknown): T[] {
+  if (!payload) return [];
+  const p = payload as Record<string, unknown>;
+
+  if (p.data && typeof p.data === "object" && !Array.isArray(p.data)) {
+    const inner = (p.data as Record<string, unknown>).data;
+    if (Array.isArray(inner)) return inner as T[];
+  }
+
+  if (Array.isArray(p.data)) return p.data as T[];
+
+  for (const key of ["events", "stories", "galleries", "gallery", "items", "results"]) {
+    const value = p[key];
+    if (Array.isArray(value)) return value as T[];
+  }
+
+  if (Array.isArray(payload)) return payload as T[];
+
+  return [];
+}
+
+async function fetchJson(path: string): Promise<unknown> {
+  const url = `${API_URL}${path}`;
   try {
-    const res = await fetch(`${API_URL}${path}`, {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
       next: { revalidate: 60 },
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
+
+    if (!res.ok) {
+      console.error(`[home] GET ${url} → ${res.status} ${res.statusText}`);
+      return null;
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error(`[home] GET ${url} failed:`, err);
     return null;
   }
 }
 
 async function getLatestStories(limit = 3): Promise<Story[]> {
-  const res = await fetchJson<{ data: { data: Story[] } }>(
-    `/api/stories?per_page=${limit}`
-  );
-  return res?.data?.data ?? [];
+  const json = await fetchJson(`/api/stories?status=published&per_page=${limit}`);
+  return extractArray<Story>(json);
 }
 
 async function getUpcomingEvents(limit = 3): Promise<EventItem[]> {
-  const res = await fetchJson<{ data: { data: EventItem[] } }>(
-    `/api/events?per_page=${limit}`
-  );
-  return res?.data?.data ?? [];
+  let json = await fetchJson(`/api/events?per_page=${limit}`);
+  let events = extractArray<EventItem>(json);
+
+  if (events.length === 0) {
+    const publishedJson = await fetchJson(
+      `/api/events?status=published&per_page=${limit}`
+    );
+    const published = extractArray<EventItem>(publishedJson);
+    if (published.length > 0) {
+      events = published;
+    }
+  }
+
+  const now = Date.now();
+  return [...events].sort((a, b) => {
+    const aUpcoming = new Date(a.event_date).getTime() >= now ? 0 : 1;
+    const bUpcoming = new Date(b.event_date).getTime() >= now ? 0 : 1;
+    if (aUpcoming !== bUpcoming) return aUpcoming - bUpcoming;
+    return new Date(a.event_date).getTime() - new Date(b.event_date).getTime();
+  });
 }
 
 async function getLatestGalleries(limit = 2): Promise<GalleryItem[]> {
-  const res = await fetchJson<{ data: { data: GalleryItem[] } }>(
-    `/api/gallery?per_page=${limit}`
-  );
-  return res?.data?.data ?? [];
+  const json = await fetchJson(`/api/gallery?per_page=${limit}`);
+  return extractArray<GalleryItem>(json);
 }
 
 function resolveImageUrl(url: string | null | undefined): string {
@@ -107,98 +152,104 @@ function formatEventDate(value: string | null | undefined): string {
    STATIC BRAND CONTENT
 ========================================================= */
 
-/* ---------------------------------------------------------
-   STAGES — Early Years, Key Stage 1, Key Stage 2
-   --------------------------------------------------------- */
 const stageHighlights = [
   {
     number: "01",
     title: "Early Years",
-    years: "Ages 3–5",
+    years: "Pre-Nursery · Nursery · Reception",
     description:
-      "A warm and engaging foundation where children build confidence, curiosity and positive attitudes towards learning through play, exploration and meaningful experiences.",
-    image: "/images/school-life.jpg",
+      "A joyful first step (20 months – 5 years). We follow the British EYFS framework, blending play-based learning with specialist subjects like ICT, Swimming, PE, Art, and Music.",
+    image: "/images/ey.jpg",
     href: "/academics",
   },
   {
     number: "02",
     title: "Key Stage 1",
-    years: "Years 1 & 2 · Ages 5–7",
+    years: "Year 1 & Year 2",
     description:
-      "Building strong foundations in reading, writing and mathematics while nurturing creativity, communication and a genuine love of learning.",
-    image: "/images/creative-arts.jpg",
+      "Building strong foundations in English (including Phonics) and Maths. Learning is enriched with Global Perspectives, ICT, Art, Music, and PE through topic-themed lessons.",
+    image: "/images/ks1.jpg",
     href: "/academics",
   },
   {
     number: "03",
-    title: "Key Stage 2",
-    years: "Years 3 – 6 · Ages 7–11",
+    title: "Lower Key Stage 2",
+    years: "Year 3 & Year 4",
     description:
-      "Developing independent, confident learners with deeper knowledge, critical thinking, research skills and the resilience to embrace new challenges.",
+      "Broadening the learning experience with Science, Global Perspectives, Art, and Music, alongside core English and Mathematics. Curriculum links provide real-world contexts.",
     image: "/images/ict.JPG",
+    href: "/academics",
+  },
+  {
+    number: "04",
+    title: "Upper Key Stage 2",
+    years: "Year 5 & Year 6",
+    description:
+      "Preparing for secondary school. Students take greater responsibility for their learning, developing critical thinking skills meticulously aligned for Cambridge Checkpoint exams.",
+    image: "/images/uks.JPG",
     href: "/academics",
   },
 ];
 
 const learningAreas = [
   {
-    title: "Academic Learning",
+    title: "Cambridge Curriculum",
     description:
-      "Strong foundations in core learning alongside opportunities to explore ideas, solve problems and develop understanding.",
-    icon: "Aa",
+      "Fully registered with Cambridge Examinations. Year 6 students take the Cambridge Checkpoint Exams annually.",
+    icon: "🎓",
   },
   {
-    title: "ICT & Technology",
+    title: "Jolly Phonics",
     description:
-      "Purposeful use of technology to support creativity, communication, research, problem-solving and digital confidence.",
-    icon: "⌘",
+      "A multi-sensory synthetic phonics method used in Reception to get children reading and writing from an early age.",
+    icon: "🔤",
   },
   {
-    title: "Research",
+    title: "Clubs & Field Trips",
     description:
-      "Learners develop structured research skills and apply them to assignments across different subject areas.",
-    icon: "⌕",
-  },
-  {
-    title: "Clubs",
-    description:
-      "A broad programme of after-school and lunchtime clubs — sports, arts, coding, chess, reading, music and more — where learners pursue interests and develop new skills.",
+      "From ICT, Art, and Music to Dance and Drama. Plus trips to Game Haven for Year 6 team building and independence.",
     icon: "◈",
   },
   {
-    title: "Sports & Swimming",
+    title: "Swimming & Sports",
     description:
-      "Physical activities that encourage teamwork, confidence, coordination, resilience and an active lifestyle.",
+      "Two on-campus pools. All Year 1-6 students participate in swim lessons between September and March with 3 lifeguards.",
     icon: "⚽",
   },
   {
-    title: "Creative Arts",
+    title: "The House System",
     description:
-      "Music, dance, drama and creative activities that give learners opportunities to express themselves.",
-    icon: "♫",
+      "Fostering camaraderie through four Houses: Red Chipembere, Green Njobvu, Yellow Swala, and Blue Mbidzi.",
+    icon: "🛡️",
+  },
+  {
+    title: "Learning Support",
+    description:
+      "Inclusive education included in school fees, providing extra guidance to ensure no child is left behind.",
+    icon: "♡",
   },
 ];
 
 const reasons = [
   {
-    title: "A Caring Environment",
+    title: "Meaningful Learning Experiences",
     description:
-      "We value the individual child and aim to create an environment where learners feel encouraged to participate, explore and grow.",
+      "We provide an engaging & ever-evolving curriculum that prepares children for life beyond the classroom.",
   },
   {
-    title: "A Vibrant Community",
+    title: "Beyond Academics",
     description:
-      "Our school brings together children and families from both expatriate and Malawian communities.",
+      "Excellence is achieved by taking learning out of the classroom, into the community, and fostering 21st-century skills.",
   },
   {
-    title: "Learning Beyond the Classroom",
+    title: "Dedicated Educators",
     description:
-      "Learning is enriched through technology, creativity, physical activities, research, projects and practical experiences.",
+      "Our teaching approach is personalised to ensure that every student's learning journey is as special as they are.",
   },
   {
-    title: "Growth, Excellence & Empathy",
+    title: "Nurturing Hearts & Minds",
     description:
-      "Our school identity is centred on fostering growth, excellence and empathy throughout the learner's journey.",
+      "Instilling in our students the confidence, curiosity, and passion to pursue their dreams, wherever they may lead.",
   },
 ];
 
@@ -207,19 +258,19 @@ const journey = [
     step: "01",
     title: "Discover",
     description:
-      "Children are encouraged to ask questions, explore their interests and discover the world around them.",
+      "Children are encouraged to ask questions, explore their interests, and discover the world around them.",
   },
   {
     step: "02",
     title: "Develop",
     description:
-      "Learners build knowledge, skills, confidence and positive learning habits.",
+      "Learners build knowledge, skills, confidence, and positive learning habits.",
   },
   {
     step: "03",
     title: "Create",
     description:
-      "Learners use their knowledge and imagination to solve problems, communicate ideas and create.",
+      "Learners use their knowledge and imagination to solve problems, communicate ideas, and create.",
   },
   {
     step: "04",
@@ -227,6 +278,29 @@ const journey = [
     description:
       "Learners grow in independence and confidence as they prepare for the opportunities ahead.",
   },
+];
+
+/* ---------------------------------------------------------
+   Subjects shown in the animated ribbon
+   (duplicated 2× so the marquee loops seamlessly)
+--------------------------------------------------------- */
+const SUBJECTS_RIBBON = [
+  "English",
+  "Mathematics",
+  "Science",
+  "Jolly Phonics",
+  "Global Perspectives",
+  "ICT & Computing",
+  "Art & Design",
+  "Music",
+  "Drama & Dance",
+  "Physical Education",
+  "Swimming",
+  "Library & Reading",
+  "Cambridge Curriculum",
+  "Cambridge Checkpoint",
+  "Learning Support",
+  "House Competitions",
 ];
 
 /* =========================================================
@@ -256,10 +330,10 @@ export default async function Home() {
     .filter((img) => img.url);
 
   const heroImage =
-    resolveImageUrl(heroGallery?.cover_image) || "/images/school-life.jpg";
+    resolveImageUrl(heroGallery?.cover_image) || "/images/school1.jpg";
 
   const schoolLifeImage =
-    resolveImageUrl(featuredGallery?.cover_image) || "/images/sports.JPG";
+    resolveImageUrl(featuredGallery?.cover_image) || "/images/school-3.jpg";
 
   const hasNews =
     Boolean(featuredStory) ||
@@ -268,6 +342,20 @@ export default async function Home() {
 
   return (
     <main className="bg-white text-[#172033]">
+      {/* ---------- shared animation styles ---------- */}
+      <style>{`
+        @keyframes mv-marquee {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        .mv-marquee { animation: mv-marquee 40s linear infinite; }
+        .mv-marquee:hover { animation-play-state: paused; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .mv-marquee { animation: none; }
+        }
+      `}</style>
+
       {/* =========================================================
           HERO
       ========================================================== */}
@@ -276,7 +364,6 @@ export default async function Home() {
         <div className="pointer-events-none absolute -bottom-48 -left-40 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/10" />
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-24">
-          {/* HERO TEXT */}
           <div className="order-2 lg:order-1">
             <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFE900]">
               <span className="h-2.5 w-2.5 rounded-full bg-[#FFE900]" />
@@ -289,15 +376,16 @@ export default async function Home() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
-              Welcome to Mount View International Primary School & Early Years
-              Centre — a nurturing and inclusive learning environment for
-              children from both expatriate and Malawian families.
+              At Mount View, we see learning as more than just an academic
+              pursuit—it is a lifelong adventure filled with discovery,
+              creativity, and joy.
             </p>
 
             <p className="mt-4 max-w-xl text-base leading-7 text-white/75">
-              With a vibrant community of over 600 students, Mount View brings
-              together learning, creativity, technology, physical development
-              and opportunities for children to grow with confidence.
+              As a vibrant mosaic of cultures, we are dedicated to nurturing not
+              only the minds but also the hearts of our students, instilling in
+              them the confidence, curiosity, and passion to pursue their
+              dreams.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -333,45 +421,37 @@ export default async function Home() {
               </div>
 
               <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">3</p>
+                <p className="text-2xl font-black text-[#FFE900]">4</p>
                 <p className="mt-1 text-[11px] font-semibold leading-tight text-blue-100">
-                  Early Years · KS1 · KS2
+                  Stages (Early Years → Year 6)
                 </p>
               </div>
             </div>
           </div>
 
-          {/* HERO IMAGE — ADVERTISING STYLE */}
           <div className="order-1 lg:order-2">
             <div className="relative isolate">
-              {/* Glow behind the frame */}
               <div className="pointer-events-none absolute -inset-3 z-0 rounded-[2.5rem] bg-[#FFE900]/15 blur-2xl" />
 
-              {/* Advertising frame */}
               <div className="relative z-10 overflow-hidden rounded-[2rem] border-[10px] border-white/10 bg-[#171B4A] shadow-2xl ring-1 ring-white/10">
                 <div className="relative">
-                  {/* Base image */}
                   <ImageWithFallback
                     src={heroImage}
                     alt="Learners enjoying school life at Mount View International Primary School"
                     className="aspect-[4/5] w-full sm:aspect-[4/3]"
                   />
 
-                  {/* Gradient overlay — always in front of the image */}
                   <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/55 to-transparent" />
 
-                  {/* Top-left badge */}
                   <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
                     <span className="h-2 w-2 animate-pulse rounded-full bg-[#F58220]" />
-                    Applications open for 2026
+                    Applications open
                   </div>
 
-                  {/* Top-right badge */}
                   <div className="absolute right-4 top-4 z-20 rounded-full border border-white/25 bg-black/35 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white backdrop-blur-md">
-                    Since 1975
+                    Cambridge Curriculum
                   </div>
 
-                  {/* Bottom advertising panel */}
                   <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
                     <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
                       <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFE900]">
@@ -409,7 +489,6 @@ export default async function Home() {
                 </div>
               </div>
 
-              {/* Floating promo ribbon — right edge, desktop only */}
               <div className="absolute -right-3 top-1/3 z-20 hidden -translate-y-1/2 rotate-[6deg] rounded-xl bg-[#F58220] px-4 py-3 shadow-2xl lg:block">
                 <p className="text-[10px] font-black uppercase tracking-widest text-white/85">
                   Enrolling
@@ -419,7 +498,6 @@ export default async function Home() {
                 </p>
               </div>
 
-              {/* Trust badge — bottom-right */}
               <div className="absolute -bottom-5 -right-3 z-20 hidden items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl lg:flex">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68] text-lg text-[#FFE900]">
                   ♡
@@ -439,6 +517,27 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
+          SUBJECTS RIBBON — animated marquee
+      ========================================================== */}
+      <section
+        aria-label="Subjects taught at Mount View"
+        className="overflow-hidden border-y border-slate-200 bg-white py-4"
+      >
+        <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
+          {/* Render the list twice for a seamless loop */}
+          {[...SUBJECTS_RIBBON, ...SUBJECTS_RIBBON].map((subject, i) => (
+            <span
+              key={`${subject}-${i}`}
+              className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.2em] text-[#252B68]/70"
+            >
+              <span className="text-[#F58220]">✦</span>
+              {subject}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* =========================================================
           SCHOOL INTRODUCTION
       ========================================================== */}
       <section className="bg-white py-20 sm:py-24">
@@ -448,21 +547,15 @@ export default async function Home() {
           </p>
 
           <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl lg:text-5xl">
-            A school community built around children.
+            A vibrant community built around children.
           </h2>
 
           <p className="mx-auto mt-6 max-w-4xl text-lg leading-8 text-slate-600">
-            Established in 1975, Mount View International Primary School and
-            Early Years Centre provides a nurturing and inclusive educational
-            environment for children from both expatriate and Malawian
-            families. With a vibrant community of over 600 students, the
-            school provides a place where children can learn, develop
-            friendships, discover their interests and grow in confidence.
-          </p>
-
-          <p className="mx-auto mt-5 max-w-3xl text-base leading-7 text-slate-500">
-            Our aim is to create meaningful learning experiences while
-            fostering the values of growth, excellence and empathy.
+            We are honored to have your children as part of our school
+            community, where their happiness, growth, and success are at the
+            heart of everything we do. Our teaching approach is personalised to
+            ensure that every student&apos;s learning journey is as special as
+            they are.
           </p>
 
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
@@ -495,29 +588,30 @@ export default async function Home() {
                 A Long-Standing School
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                An established school community with a history dating back to
-                1975.
+                Founded by Mrs. Sakker Sacranie with a vision to offer quality
+                education at affordable prices.
               </p>
             </div>
 
             <div className="rounded-3xl bg-[#252B68] p-7 text-center shadow-sm">
-              <p className="text-4xl font-black text-[#FFE900]">600+</p>
+              <p className="text-4xl font-black text-[#FFE900]">Cambridge</p>
               <p className="mt-2 font-bold text-white">
-                Students & Growing Community
+                International Curriculum
               </p>
               <p className="mt-3 text-sm leading-6 text-blue-100">
-                A vibrant community bringing learners and families together.
+                Registered with the University of Cambridge Examinations,
+                offering Checkpoint exams in Year 6.
               </p>
             </div>
 
             <div className="rounded-3xl bg-[#FFE900] p-7 text-center shadow-sm">
-              <p className="text-4xl font-black text-[#252B68]">3</p>
+              <p className="text-4xl font-black text-[#252B68]">4</p>
               <p className="mt-2 font-bold text-[#252B68]">
-                Early Years, KS1 & KS2
+                Distinct Learning Stages
               </p>
               <p className="mt-3 text-sm leading-6 text-[#252B68]/70">
-                Supporting children through every stage of their primary school
-                journey — Early Years, Key Stage 1 and Key Stage 2.
+                Supporting children through Early Years, KS1, Lower KS2, and
+                Upper KS2.
               </p>
             </div>
           </div>
@@ -525,7 +619,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          THREE HIGHLIGHTS — EARLY YEARS, KS1, KS2
+          STAGES HIGHLIGHTS
       ========================================================== */}
       <section className="bg-white py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -539,13 +633,13 @@ export default async function Home() {
             </h2>
 
             <p className="mt-5 text-lg leading-8 text-slate-600">
-              From the first steps in Early Years to confident learners in Key
-              Stage 2, every stage of the Mount View journey is designed around
-              what children need to flourish.
+              From the first steps in Early Years to confident learners in Year
+              6, every stage of the Mount View journey is designed around what
+              children need to flourish.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
+          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {stageHighlights.map((item) => (
               <article
                 key={item.number}
@@ -561,23 +655,23 @@ export default async function Home() {
                   <span className="absolute left-4 top-4 z-20 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-md">
                     {item.number}
                   </span>
-                  <span className="absolute right-4 top-4 z-20 inline-flex items-center rounded-full bg-black/45 px-3 py-1 text-[11px] font-black text-white backdrop-blur-md">
-                    {item.years}
-                  </span>
                 </div>
 
-                <div className="p-7">
-                  <h3 className="text-2xl font-black text-[#252B68]">
+                <div className="p-6">
+                  <p className="text-xs font-bold text-[#F58220] uppercase tracking-wider mb-2">
+                    {item.years}
+                  </p>
+                  <h3 className="text-xl font-black text-[#252B68]">
                     {item.title}
                   </h3>
 
-                  <p className="mt-3 leading-7 text-slate-600">
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
                     {item.description}
                   </p>
 
                   <Link
                     href={item.href}
-                    className="mt-5 inline-flex font-bold text-[#252B68] transition hover:text-[#F58220]"
+                    className="mt-5 inline-flex text-sm font-bold text-[#252B68] transition hover:text-[#F58220]"
                   >
                     Discover this stage
                     <span className="ml-2 transition group-hover:translate-x-1">
@@ -609,7 +703,6 @@ export default async function Home() {
               <p className="text-xs font-black uppercase tracking-wider text-[#252B68]">
                 Our values
               </p>
-
               <p className="mt-1 font-black text-[#252B68]">
                 Growth • Excellence • Empathy
               </p>
@@ -626,8 +719,8 @@ export default async function Home() {
             </h2>
 
             <p className="mt-6 text-lg leading-8 text-slate-600">
-              We want children to develop not only what they know, but also
-              how they think, communicate, collaborate and respond to new
+              We want children to develop not only what they know, but also how
+              they think, communicate, collaborate, and respond to new
               challenges.
             </p>
 
@@ -663,7 +756,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          LEARNING AREAS — Clubs replaces STEAM
+          LEARNING AREAS
       ========================================================== */}
       <section className="bg-[#252B68] py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -677,7 +770,7 @@ export default async function Home() {
             </h2>
 
             <p className="mt-5 text-lg leading-8 text-blue-100">
-              Learners experience a broad range of academic, digital, creative
+              Learners experience a broad range of academic, digital, creative,
               and physical opportunities designed to support their development.
             </p>
           </div>
@@ -715,83 +808,6 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          ICT / DIGITAL LEARNING FEATURE
-      ========================================================== */}
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid items-center gap-12 lg:grid-cols-2">
-            <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
-                Preparing Learners for Tomorrow
-              </p>
-
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
-                Technology, research and creativity in learning.
-              </h2>
-
-              <p className="mt-6 text-lg leading-8 text-slate-600">
-                Learning at Mount View includes opportunities to use
-                technology, investigate questions, work on projects and
-                develop the skills needed to approach unfamiliar challenges.
-              </p>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-2">
-                {[
-                  "Digital confidence",
-                  "Research skills",
-                  "Creative thinking",
-                  "Problem solving",
-                  "Collaboration",
-                  "Independent learning",
-                ].map((skill) => (
-                  <div
-                    key={skill}
-                    className="flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3"
-                  >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FFE900] text-sm font-black text-[#252B68]">
-                      ✓
-                    </span>
-
-                    <span className="font-semibold text-slate-700">
-                      {skill}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              <Link
-                href="/academics#research"
-                className="mt-9 inline-flex items-center font-black text-[#252B68] transition hover:text-[#F58220]"
-              >
-                Discover our learning approach
-                <span className="ml-2">→</span>
-              </Link>
-            </div>
-
-            <div className="relative isolate">
-              <div className="overflow-hidden rounded-[2rem] shadow-2xl">
-                <ImageWithFallback
-                  src="/images/ict.JPG"
-                  alt="Learners using technology in the classroom"
-                  className="aspect-[4/3] w-full"
-                />
-              </div>
-
-              <div className="absolute -bottom-6 -left-4 z-20 max-w-xs rounded-2xl bg-[#F58220] p-5 text-white shadow-2xl sm:-left-8">
-                <p className="text-xs font-black uppercase tracking-wider text-white/75">
-                  Learning by doing
-                </p>
-
-                <p className="mt-1 text-lg font-black">
-                  Think. Explore. Create.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
           LEARNER JOURNEY
       ========================================================== */}
       <section className="bg-slate-50 py-20 sm:py-24">
@@ -807,7 +823,7 @@ export default async function Home() {
 
             <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
               We want learners to leave each stage of their journey with
-              stronger knowledge, growing independence and the confidence to
+              stronger knowledge, growing independence, and the confidence to
               embrace new opportunities.
             </p>
           </div>
@@ -859,7 +875,7 @@ export default async function Home() {
 
             <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-14">
               <p className="text-sm font-black uppercase tracking-[0.2em] text-[#252B68]">
-                School Life
+                Extra Curricular Activities
               </p>
 
               <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
@@ -868,21 +884,20 @@ export default async function Home() {
 
               <p className="mt-5 text-lg leading-8 text-[#252B68]/80">
                 School life gives learners opportunities to participate,
-                collaborate, compete, create and discover interests beyond
+                collaborate, compete, create, and discover interests beyond
                 their regular classroom learning.
               </p>
 
               <div className="mt-7 flex flex-wrap gap-2">
                 {[
-                  "Sports",
                   "Swimming",
-                  "ICT",
-                  "Clubs",
-                  "Arts",
+                  "Sports",
+                  "Art",
                   "Music",
-                  "Dance",
-                  "Drama",
-                  "Competitions",
+                  "Drama & Dance",
+                  "Life Skills Clubs",
+                  "Field Trips",
+                  "House Competitions",
                 ].map((item) => (
                   <span
                     key={item}
@@ -917,8 +932,7 @@ export default async function Home() {
                 </p>
 
                 <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
-                  {featuredGallery?.title ||
-                    "Moments from around the school."}
+                  {featuredGallery?.title || "Moments from around the school."}
                 </h2>
 
                 {featuredGallery?.description && (
@@ -940,7 +954,7 @@ export default async function Home() {
               <Link
                 href={
                   featuredGallery
-                    ? `/gallery/${featuredGallery.slug}`
+                    ? `/gallery?album=${featuredGallery.slug}`
                     : "/gallery"
                 }
                 className="group relative isolate col-span-2 row-span-2 overflow-hidden rounded-3xl"
@@ -963,7 +977,7 @@ export default async function Home() {
                   key={img.id}
                   href={
                     featuredGallery
-                      ? `/gallery/${featuredGallery.slug}`
+                      ? `/gallery?album=${featuredGallery.slug}`
                       : "/gallery"
                   }
                   className="group relative isolate overflow-hidden rounded-3xl"
@@ -1009,7 +1023,7 @@ export default async function Home() {
             <div className="mt-12 grid gap-6 md:grid-cols-3">
               {featuredStory && (
                 <Link
-                  href={`/news/${featuredStory.slug}`}
+                  href={`/news?story=${featuredStory.slug}`}
                   className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
                 >
                   <ImageWithFallback
@@ -1040,7 +1054,7 @@ export default async function Home() {
 
               {featuredEvent && (
                 <Link
-                  href={`/events/${featuredEvent.slug}`}
+                  href={`/news?event=${featuredEvent.slug}`}
                   className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
                 >
                   <ImageWithFallback
@@ -1076,7 +1090,7 @@ export default async function Home() {
 
               {featuredGallery && (
                 <Link
-                  href={`/gallery/${featuredGallery.slug}`}
+                  href={`/gallery?album=${featuredGallery.slug}`}
                   className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
                 >
                   <ImageWithFallback
@@ -1104,44 +1118,24 @@ export default async function Home() {
                   </div>
                 </Link>
               )}
-
-              {!featuredGallery && secondaryStory && (
-                <Link
-                  href={`/news/${secondaryStory.slug}`}
-                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <ImageWithFallback
-                    src={
-                      resolveImageUrl(secondaryStory.image_url) ||
-                      "/images/school-life.jpg"
-                    }
-                    alt={secondaryStory.title}
-                    className="aspect-[16/10] w-full"
-                  />
-
-                  <div className="p-6">
-                    <p className="text-xs font-black uppercase tracking-wider text-[#F58220]">
-                      More News
-                    </p>
-
-                    <h3 className="mt-2 line-clamp-2 text-xl font-black text-[#252B68]">
-                      {secondaryStory.title}
-                    </h3>
-
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">
-                      {secondaryStory.excerpt ||
-                        "Catch up with what our learners have been doing."}
-                    </p>
-                  </div>
-                </Link>
-              )}
             </div>
+
+            {!featuredEvent && (featuredStory || featuredGallery) && (
+              <p className="mt-6 text-center text-xs text-slate-400">
+                No upcoming events were returned from the API. If you have
+                events in the admin, check that
+                <code className="mx-1 rounded bg-slate-100 px-1">
+                  /api/events
+                </code>
+                is returning data — see the server console for details.
+              </p>
+            )}
           </div>
         </section>
       )}
 
       {/* =========================================================
-          ADMISSIONS CTA — clear application intent
+          ADMISSIONS CTA
       ========================================================== */}
       <section className="relative overflow-hidden bg-[#252B68] py-20 sm:py-24">
         <div className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F58220]/10" />
@@ -1189,13 +1183,13 @@ export default async function Home() {
               </div>
 
               <h3 className="mt-6 text-2xl font-black text-white">
-                Fostering growth, excellence and empathy.
+                Fostering growth, excellence, and empathy.
               </h3>
 
               <p className="mt-4 leading-8 text-blue-100">
                 These values are at the heart of the Mount View experience and
                 guide our approach to supporting learners as they develop their
-                knowledge, confidence and independence.
+                knowledge, confidence, and independence.
               </p>
 
               <div className="mt-7 grid grid-cols-3 gap-2">
@@ -1308,7 +1302,7 @@ export default async function Home() {
           </p>
 
           <h2 className="mx-auto mt-4 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Give your child a place to discover, develop, create and thrive.
+            Give your child a place to discover, develop, create, and thrive.
           </h2>
 
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/90">

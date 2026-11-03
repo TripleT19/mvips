@@ -151,7 +151,7 @@ export default function ContactPage() {
       <section className="relative z-10 -mt-8 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-5 md:grid-cols-3">
           <a
-            href="tel:+265881668001"
+            href="tel:+265997355319"
             className="group rounded-3xl bg-white p-7 shadow-xl ring-1 ring-slate-100 transition hover:-translate-y-1 hover:shadow-2xl"
           >
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F58220] text-2xl">
@@ -164,7 +164,7 @@ export default function ContactPage() {
               Speak with our team for admissions and general enquiries.
             </p>
 
-            <p className="mt-2 font-semibold text-[#F58220]">0881 668 001</p>
+            <p className="mt-2 font-semibold text-[#F58220]">099 735 5319</p>
           </a>
 
           <a
@@ -295,7 +295,7 @@ export default function ContactPage() {
                   className="flex items-center gap-3 text-[#252B68] transition hover:text-[#F58220]"
                 >
                   <span className="text-xl">📞</span>
-                  <span className="font-semibold">0881 668 001</span>
+                  <span className="font-semibold">099 735 5319</span>
                 </a>
 
                 <a

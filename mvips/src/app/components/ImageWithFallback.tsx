@@ -22,7 +22,7 @@ export default function ImageWithFallback({
       <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#252B68] to-[#F58220]">
         <div className="text-center text-white">
           <Image
-            src="/logo.jpg"
+            src="/logo1.jpg"
             alt=""
             width={80}
             height={80}

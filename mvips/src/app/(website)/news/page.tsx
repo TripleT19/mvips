@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -11,11 +12,15 @@ import {
   MapPin,
   Newspaper,
   X,
-  Sparkles,
   Users,
 } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+/* ============================================================
+ * API CONFIG
+ * ============================================================ */
+const API_URL =
+  (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "") ||
+  "http://127.0.0.1:8000";
 
 /* ============================================================
  * TYPES
@@ -73,12 +78,44 @@ type Event = {
   updated_at?: string | null;
 };
 
-type ApiResponse = {
-  success?: boolean;
-  data?: unknown;
-  stories?: unknown;
-  events?: unknown;
-};
+/* ============================================================
+ * SAFE FETCH + EXTRACTOR
+ * ============================================================ */
+
+async function safeFetchJson(path: string): Promise<unknown> {
+  const url = path.startsWith("http") ? path : `${API_URL}${path}`;
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      console.error(`[news] ${url} responded ${response.status}`);
+      return null;
+    }
+    return await response.json();
+  } catch (err) {
+    console.error(`[news] Failed to fetch ${url}:`, err);
+    return null;
+  }
+}
+
+function extractArray<T = unknown>(payload: unknown): T[] {
+  if (!payload) return [];
+  const p = payload as Record<string, unknown>;
+
+  if (p.data && typeof p.data === "object" && !Array.isArray(p.data)) {
+    const inner = (p.data as Record<string, unknown>).data;
+    if (Array.isArray(inner)) return inner as T[];
+  }
+  if (Array.isArray(p.data)) return p.data as T[];
+  for (const key of ["stories", "events", "items", "results", "data"]) {
+    const value = p[key];
+    if (Array.isArray(value)) return value as T[];
+  }
+  if (Array.isArray(payload)) return payload as T[];
+  return [];
+}
 
 /* ============================================================
  * FORMATTERS
@@ -145,14 +182,6 @@ function getImageUrl(image: string | null | undefined): string | null {
 
 /* ============================================================
  * CONTENT RENDERING
- * ============================================================
- *
- * Handles every content shape the admin editor can store:
- *   • HTML (<p>, <h2>, <strong>…)
- *   • Plain text with REAL newlines
- *   • Plain text with LITERAL "\n" (backslash + n pasted as text)
- *   • Markdown **bold** markers pasted from a chat
- *   • One giant unbroken paragraph
  * ============================================================ */
 
 function escapeHtml(text: string): string {
@@ -209,19 +238,6 @@ function stripMarkdownBold(text: string): string {
   return text.replace(/\*\*([^*]+)\*\*/g, "$1");
 }
 
-/**
- * Universal newline normalisation — converts every escape
- * sequence AND every real newline variant to a single real LF.
- *
- *   "\\r\\n"  (literal backslash-r + backslash-n) → "\n"
- *   "\\n"     (literal backslash-n)               → "\n"
- *   "\\r"     (literal backslash-r)               → "\n"
- *   "\r\n"    (real CR + LF)                      → "\n"
- *   "\r"      (real CR)                           → "\n"
- *
- * Critically this uses a SIMPLE replace (no captured-context
- * group) so consecutive \n\n sequences convert BOTH times.
- */
 function normaliseNewlines(text: string): string {
   return text
     .replace(/\\r\\n/g, "\n")
@@ -233,18 +249,13 @@ function normaliseNewlines(text: string): string {
 
 function plainTextToHtml(text: string): string {
   const clean = stripMarkdownBold(text);
-
   const hasDoubleNewlines = /\n\s*\n/.test(clean);
 
   let blocks: string[];
 
   if (hasDoubleNewlines) {
-    /* Content uses blank lines between paragraphs — honour them.
-       Single newlines inside a paragraph stay as <br />. */
     blocks = clean.split(/\n\s*\n/);
   } else if (clean.includes("\n")) {
-    /* No blank lines, but the user did put breaks — treat each
-       newline as a paragraph boundary so it doesn't wall up. */
     blocks = clean.split("\n");
   } else {
     blocks = [clean];
@@ -252,8 +263,6 @@ function plainTextToHtml(text: string): string {
 
   blocks = blocks.map((b) => b.trim()).filter(Boolean);
 
-  /* Sentence-aware fallback: a >400-char single paragraph with
-     no breaks at all. Split into ~3-sentence groups. */
   if (blocks.length === 1 && blocks[0].length > 400) {
     const long = blocks[0];
     const sentences = long
@@ -270,7 +279,6 @@ function plainTextToHtml(text: string): string {
     if (grouped.length > 1) {
       blocks = grouped;
     } else {
-      /* No sentence boundaries either — hard-wrap every ~350 chars */
       const wrap = 350;
       const broken: string[] = [];
       let buf = long;
@@ -292,66 +300,22 @@ function plainTextToHtml(text: string): string {
 
 function formatContent(raw: string | null | undefined): string {
   let text = raw ?? "";
-
-  /* 1. Universal newline normalisation (real + literal) */
-  text = normaliseNewlines(text);
-  text = text.trim();
+  text = normaliseNewlines(text).trim();
   if (!text) return "";
-
-  /* 2. HTML content → trust the editor, strip heavy bold */
   if (looksLikeHtml(text)) {
     return stripExcessiveBoldHtml(sanitizeHtml(text));
   }
-
-  /* 3. Plain text → decode any double-escaped entities, then
-     build real <p> blocks. */
   text = decodeCommonEntities(text);
   return plainTextToHtml(text);
 }
 
 function formatExcerpt(raw: string | null | undefined): string {
   if (!raw) return "";
-  let text = normaliseNewlines(String(raw));
+  const text = normaliseNewlines(String(raw));
   if (looksLikeHtml(text)) {
     return sanitizeHtml(text).replace(/<[^>]*>/g, "").trim();
   }
   return stripMarkdownBold(decodeCommonEntities(text)).trim();
-}
-
-function getNewsArray(responseData: ApiResponse): Story[] {
-  if (
-    responseData?.data &&
-    typeof responseData.data === "object" &&
-    "data" in responseData.data &&
-    Array.isArray((responseData.data as { data?: unknown }).data)
-  ) {
-    return (responseData.data as { data: Story[] }).data;
-  }
-  if (responseData?.data && Array.isArray(responseData.data)) {
-    return responseData.data as Story[];
-  }
-  if (Array.isArray(responseData?.stories)) {
-    return responseData.stories as Story[];
-  }
-  return [];
-}
-
-function getEventsArray(responseData: ApiResponse): Event[] {
-  if (
-    responseData?.data &&
-    typeof responseData.data === "object" &&
-    "data" in responseData.data &&
-    Array.isArray((responseData.data as { data?: unknown }).data)
-  ) {
-    return (responseData.data as { data: Event[] }).data;
-  }
-  if (responseData?.data && Array.isArray(responseData.data)) {
-    return responseData.data as Event[];
-  }
-  if (Array.isArray(responseData?.events)) {
-    return responseData.events as Event[];
-  }
-  return [];
 }
 
 function getStoryDate(story: Story): string {
@@ -365,10 +329,12 @@ function getStoryDate(story: Story): string {
 }
 
 /* ============================================================
- * PAGE
+ * PAGE CONTENT
  * ============================================================ */
 
-export default function NewsPage() {
+function NewsPageContent() {
+  const searchParams = useSearchParams();
+
   const [stories, setStories] = useState<Story[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingStories, setLoadingStories] = useState(true);
@@ -378,6 +344,37 @@ export default function NewsPage() {
 
   const [selectedStory, setSelectedStory] = useState<Story | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+
+  /* ---------- auto-open from ?story= / ?event= ---------- */
+  const autoOpenedParam = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (loadingStories || loadingEvents) return;
+
+    const storySlug = searchParams.get("story");
+    const eventSlug = searchParams.get("event");
+    const paramKey = storySlug
+      ? `story:${storySlug}`
+      : eventSlug
+      ? `event:${eventSlug}`
+      : null;
+
+    if (!paramKey || autoOpenedParam.current === paramKey) return;
+
+    if (storySlug) {
+      const found = stories.find((s) => s.slug === storySlug);
+      if (found) {
+        setSelectedStory(found);
+        autoOpenedParam.current = paramKey;
+      }
+    } else if (eventSlug) {
+      const found = events.find((e) => e.slug === eventSlug);
+      if (found) {
+        setSelectedEvent(found);
+        autoOpenedParam.current = paramKey;
+      }
+    }
+  }, [loadingStories, loadingEvents, stories, events, searchParams]);
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -407,18 +404,12 @@ export default function NewsPage() {
     async function loadNews() {
       try {
         setLoadingStories(true);
-        const response = await fetch(
-          `${API_URL}/api/stories?status=published&per_page=50`,
-          { headers: { Accept: "application/json" }, cache: "no-store" }
+        const json = await safeFetchJson(
+          `/api/stories?status=published&per_page=50`
         );
-        if (!response.ok) {
-          throw new Error(`News request failed: ${response.status}`);
-        }
-        const responseData = (await response.json()) as ApiResponse;
-        if (mounted) setStories(getNewsArray(responseData));
-      } catch (err) {
-        console.error("Failed to load news:", err);
-        if (mounted) {
+        if (!mounted) return;
+        setStories(extractArray<Story>(json));
+        if (!json) {
           setError(
             "We could not load the latest school news. Please try again shortly."
           );
@@ -431,17 +422,9 @@ export default function NewsPage() {
     async function loadEvents() {
       try {
         setLoadingEvents(true);
-        const response = await fetch(
-          `${API_URL}/api/events?per_page=50`,
-          { headers: { Accept: "application/json" }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`Events request failed: ${response.status}`);
-        }
-        const responseData = (await response.json()) as ApiResponse;
-        if (mounted) setEvents(getEventsArray(responseData));
-      } catch (err) {
-        console.error("Failed to load events:", err);
+        const json = await safeFetchJson(`/api/events?per_page=50`);
+        if (!mounted) return;
+        setEvents(extractArray<Event>(json));
       } finally {
         if (mounted) setLoadingEvents(false);
       }
@@ -456,10 +439,10 @@ export default function NewsPage() {
   }, []);
 
   const categories = useMemo(() => {
-    const categoryNames = stories
-      .map((story) => getCategoryName(story.category))
+    const names = stories
+      .map((s) => getCategoryName(s.category))
       .filter(Boolean);
-    return ["All", ...Array.from(new Set(categoryNames))];
+    return ["All", ...Array.from(new Set(names))];
   }, [stories]);
 
   const filteredStories = useMemo(() => {
@@ -471,7 +454,7 @@ export default function NewsPage() {
 
   const featuredStory = useMemo(() => {
     return (
-      filteredStories.find((story) => Boolean(story.featured)) ||
+      filteredStories.find((s) => Boolean(s.featured)) ||
       filteredStories[0] ||
       null
     );
@@ -479,302 +462,436 @@ export default function NewsPage() {
 
   const latestStories = useMemo(() => {
     if (!featuredStory) return filteredStories;
-    return filteredStories.filter((story) => story.id !== featuredStory.id);
+    return filteredStories.filter((s) => s.id !== featuredStory.id);
   }, [filteredStories, featuredStory]);
 
   const upcomingEvents = useMemo(() => {
     return [...events]
       .sort(
         (a, b) =>
-          new Date(a.event_date).getTime() -
-          new Date(b.event_date).getTime()
+          new Date(a.event_date).getTime() - new Date(b.event_date).getTime()
       )
       .slice(0, 6);
   }, [events]);
 
   return (
     <>
-      <main className="min-h-screen bg-white text-[#172033]">
-        {/* ================= HERO ================= */}
-        <section className="relative overflow-hidden bg-[#252B68]">
-          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#FFE900]/20 blur-3xl" />
-          <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-[#F58220]/20 blur-3xl" />
+      <main className="overflow-hidden bg-white text-[#172033]">
+        {/* ---------- shared animation styles ---------- */}
+        <style>{`
+          @keyframes mv-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(8deg)} }
+          @keyframes mv-float-alt { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(14px) rotate(-8deg)} }
+          @keyframes mv-blob { 0%,100%{transform:translate(0,0) scale(1)} 33%{transform:translate(24px,-28px) scale(1.1)} 66%{transform:translate(-20px,18px) scale(.94)} }
+          @keyframes mv-pop { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+          @keyframes mv-marquee { from{transform:translateX(0)} to{transform:translateX(-50%)} }
 
-          <div className="relative mx-auto max-w-7xl px-6 py-20 sm:px-8 lg:px-10 lg:py-28">
+          .mv-float{animation:mv-float 6s ease-in-out infinite}
+          .mv-float-alt{animation:mv-float-alt 7s ease-in-out infinite}
+          .mv-blob{animation:mv-blob 16s ease-in-out infinite}
+          .mv-pop{animation:mv-pop 3.5s ease-in-out infinite}
+          .mv-marquee{animation:mv-marquee 40s linear infinite}
+
+          @media (prefers-reduced-motion: reduce){
+            .mv-float,.mv-float-alt,.mv-blob,.mv-pop,.mv-marquee{animation:none}
+          }
+        `}</style>
+
+        {/* =====================================================
+            HERO
+        ====================================================== */}
+        <section className="relative overflow-hidden bg-[#252B68]">
+          <div className="pointer-events-none absolute inset-0">
+            <div className="mv-blob absolute -left-32 -top-32 h-96 w-96 rounded-full bg-[#FFE900]/15 blur-3xl" />
+            <div className="mv-blob absolute -bottom-40 right-0 h-[30rem] w-[30rem] rounded-full bg-[#F58220]/25 blur-3xl [animation-delay:-6s]" />
+            <div className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-[#4a55b8]/40 blur-3xl" />
+          </div>
+
+          <span className="mv-float pointer-events-none absolute left-[5%] top-[18%] z-0 text-4xl opacity-80 sm:text-5xl">
+            📰
+          </span>
+          <span className="mv-float-alt pointer-events-none absolute right-[6%] top-[12%] z-0 text-4xl opacity-80 sm:text-5xl">
+            📅
+          </span>
+          <span className="mv-float pointer-events-none absolute left-[10%] bottom-[16%] z-0 text-3xl opacity-70 sm:text-4xl">
+            ✨
+          </span>
+          <span className="mv-float-alt pointer-events-none absolute right-[10%] bottom-[14%] z-0 text-3xl opacity-70 sm:text-4xl">
+            🎉
+          </span>
+          <span className="mv-pop pointer-events-none absolute left-1/2 top-[8%] hidden text-2xl opacity-60 lg:block">
+            🏆
+          </span>
+
+          <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
             <div className="max-w-3xl">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur">
-                <Newspaper size={17} className="text-[#FFE900]" />
+              <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFE900] backdrop-blur">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-[#FFE900]" />
                 Mount View News &amp; Events
               </div>
 
-              <h1 className="text-4xl font-black leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
+              <h1 className="text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
                 What&apos;s happening at{" "}
-                <span className="text-[#FFE900]">Mount View?</span>
+                <span className="relative inline-block text-[#FFE900]">
+                  Mount View?
+                  <svg
+                    className="absolute -bottom-2 left-0 w-full text-[#F58220]"
+                    viewBox="0 0 300 12"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M2 9c60-6 140-8 296-4"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
               </h1>
 
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-white/80 sm:text-xl">
+              <p className="mt-7 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
                 Discover the latest news, achievements, celebrations and
                 upcoming events from Mount View International Primary School
                 &amp; Early Years Centre.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                  <Sparkles size={16} className="text-[#FFE900]" />
+                <span className="rounded-full bg-[#F58220] px-5 py-2.5 text-sm font-bold text-white shadow-lg">
                   Fostering growth
-                </div>
-                <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                  <Users size={16} className="text-[#FFE900]" />
+                </span>
+                <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
                   Building excellence
-                </div>
-                <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white">
-                  <Newspaper size={16} className="text-[#FFE900]" />
+                </span>
+                <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/20">
                   Sharing our story
-                </div>
+                </span>
+              </div>
+
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row">
+                <a
+                  href="#news"
+                  className="group rounded-full bg-[#F58220] px-7 py-4 text-center font-black text-white shadow-xl transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-2xl"
+                >
+                  Latest News
+                  <span className="ml-2 inline-block transition group-hover:translate-x-1">
+                    ↓
+                  </span>
+                </a>
+                <a
+                  href="#events"
+                  className="rounded-full border-2 border-white/30 bg-white/10 px-7 py-4 text-center font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
+                >
+                  Upcoming Events
+                </a>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ================= NEWS ================= */}
-        <section className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
-          <div className="mb-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div>
-              <p className="mb-2 text-sm font-bold uppercase tracking-[0.2em] text-[#F58220]">
-                School News
-              </p>
-              <h2 className="text-3xl font-black text-[#252B68] sm:text-4xl">
-                Latest from Mount View
-              </h2>
-              <p className="mt-3 max-w-2xl text-gray-600">
-                Keep up with the latest activities, achievements and stories
-                from our school community.
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-[#252B68]">
-              <Newspaper size={18} />
-              {stories.length}{" "}
-              {stories.length === 1 ? "published story" : "published stories"}
-            </div>
+        {/* =====================================================
+            MARQUEE STRIP
+        ====================================================== */}
+        <section className="overflow-hidden border-y border-slate-200 bg-white py-4">
+          <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
+            {[
+              "Latest News",
+              "Upcoming Events",
+              "School Achievements",
+              "Class Activities",
+              "Community Stories",
+              "Celebrations",
+              "Sports News",
+              "Creative Arts",
+              "Latest News",
+              "Upcoming Events",
+              "School Achievements",
+              "Class Activities",
+              "Community Stories",
+              "Celebrations",
+              "Sports News",
+              "Creative Arts",
+            ].map((item, i) => (
+              <span
+                key={`${item}-${i}`}
+                className="flex items-center gap-3 text-sm font-black uppercase tracking-[0.2em] text-[#252B68]/70"
+              >
+                <span className="text-[#F58220]">✦</span>
+                {item}
+              </span>
+            ))}
           </div>
+        </section>
 
-          {!loadingStories && categories.length > 1 && (
-            <div className="mb-10 flex gap-2 overflow-x-auto pb-2">
-              {categories.map((category) => {
-                const active = selectedCategory === category;
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => setSelectedCategory(category)}
-                    className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-bold transition ${
-                      active
-                        ? "bg-[#252B68] text-white shadow-md"
-                        : "bg-gray-100 text-gray-600 hover:bg-[#252B68]/10 hover:text-[#252B68]"
-                    }`}
-                  >
-                    {category}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {error && (
-            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-              {error}
-            </div>
-          )}
-
-          {loadingStories && (
-            <div className="grid gap-8 lg:grid-cols-2">
-              <div className="h-[420px] animate-pulse rounded-3xl bg-gray-100" />
-              <div className="grid gap-5 sm:grid-cols-2">
-                <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
-                <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
-                <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
-                <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+        {/* =====================================================
+            NEWS
+        ====================================================== */}
+        <section
+          id="news"
+          className="scroll-mt-24 bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+        >
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-10 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full bg-[#F58220]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                  School News
+                </p>
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+                  Latest from Mount View
+                </h2>
+                <p className="mt-4 max-w-2xl leading-8 text-slate-600">
+                  Keep up with the latest activities, achievements and stories
+                  from our school community.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 rounded-full bg-[#252B68]/5 px-4 py-2 text-sm font-semibold text-[#252B68]">
+                <Newspaper size={18} />
+                {stories.length}{" "}
+                {stories.length === 1
+                  ? "published story"
+                  : "published stories"}
               </div>
             </div>
-          )}
 
-          {!loadingStories && filteredStories.length === 0 && (
-            <div className="rounded-3xl border border-gray-200 bg-gray-50 px-6 py-16 text-center">
-              <Newspaper size={42} className="mx-auto mb-4 text-[#252B68]" />
-              <h3 className="text-xl font-bold text-[#252B68]">
-                No news stories yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-md text-gray-600">
-                There are currently no published stories in this category.
-              </p>
-            </div>
-          )}
+            {!loadingStories && categories.length > 1 && (
+              <div className="mb-10 flex gap-2 overflow-x-auto pb-2">
+                {categories.map((category) => {
+                  const active = selectedCategory === category;
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => setSelectedCategory(category)}
+                      className={`whitespace-nowrap rounded-full px-5 py-2.5 text-sm font-bold transition ${
+                        active
+                          ? "bg-[#252B68] text-white shadow-md"
+                          : "bg-gray-100 text-gray-600 hover:bg-[#252B68]/10 hover:text-[#252B68]"
+                      }`}
+                    >
+                      {category}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-          {!loadingStories && featuredStory && (
-            <div className="grid gap-8 lg:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setSelectedStory(featuredStory)}
-                className="group overflow-hidden rounded-3xl border border-gray-200 bg-white text-left shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
-              >
-                <div className="relative h-72 overflow-hidden sm:h-96">
-                  {getImageUrl(
-                    featuredStory.image_url ||
-                      featuredStory.image ||
-                      featuredStory.image_path
-                  ) ? (
-                    <Image
-                      src={
-                        getImageUrl(
-                          featuredStory.image_url ||
-                            featuredStory.image ||
-                            featuredStory.image_path
-                        )!
-                      }
-                      alt={featuredStory.title}
-                      fill
-                      unoptimized
-                      className="object-cover transition duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#252B68] to-[#171B4A]">
-                      <Newspaper size={70} className="text-white/30" />
-                    </div>
-                  )}
+            {error && (
+              <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
+                {error}
+              </div>
+            )}
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+            {loadingStories && (
+              <div className="grid gap-8 lg:grid-cols-2">
+                <div className="h-[420px] animate-pulse rounded-3xl bg-gray-100" />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+                  <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+                  <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+                  <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+                </div>
+              </div>
+            )}
 
-                  <div className="absolute left-5 top-5">
-                    <span className="rounded-full bg-[#FFE900] px-4 py-2 text-xs font-black uppercase tracking-wide text-[#252B68]">
-                      Featured
-                    </span>
-                  </div>
+            {!loadingStories && filteredStories.length === 0 && (
+              <div className="rounded-3xl border border-gray-200 bg-gray-50 px-6 py-16 text-center">
+                <Newspaper size={42} className="mx-auto mb-4 text-[#252B68]" />
+                <h3 className="text-xl font-bold text-[#252B68]">
+                  No news stories yet
+                </h3>
+                <p className="mx-auto mt-2 max-w-md text-gray-600">
+                  There are currently no published stories in this category.
+                </p>
+              </div>
+            )}
 
-                  <div className="absolute bottom-0 left-0 right-0 p-6">
-                    {getCategoryName(featuredStory.category) && (
-                      <span className="mb-3 inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur">
-                        {getCategoryName(featuredStory.category)}
-                      </span>
-                    )}
-                    <h3 className="text-2xl font-black leading-tight text-white sm:text-3xl">
-                      {featuredStory.title}
-                    </h3>
-                    <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
-                      <div className="flex items-center gap-2">
-                        <CalendarDays size={15} />
-                        {formatDate(getStoryDate(featuredStory))}
+            {!loadingStories && featuredStory && (
+              <div className="grid gap-8 lg:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStory(featuredStory)}
+                  className="group overflow-hidden rounded-[2rem] border border-slate-100 bg-white text-left shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
+                >
+                  <div className="relative h-72 overflow-hidden sm:h-96">
+                    {getImageUrl(
+                      featuredStory.image_url ||
+                        featuredStory.image ||
+                        featuredStory.image_path
+                    ) ? (
+                      <Image
+                        src={
+                          getImageUrl(
+                            featuredStory.image_url ||
+                              featuredStory.image ||
+                              featuredStory.image_path
+                          )!
+                        }
+                        alt={featuredStory.title}
+                        fill
+                        unoptimized
+                        className="object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#252B68] to-[#171B4A]">
+                        <Newspaper size={70} className="text-white/30" />
                       </div>
-                      {featuredStory.author && (
-                        <div className="flex items-center gap-2">
-                          <Users size={15} />
-                          <span>By {featuredStory.author}</span>
-                        </div>
+                    )}
+
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+
+                    <div className="absolute left-5 top-5">
+                      <span className="rounded-full bg-[#FFE900] px-4 py-2 text-xs font-black uppercase tracking-wide text-[#252B68] shadow-lg">
+                        Featured
+                      </span>
+                    </div>
+
+                    <div className="absolute bottom-0 left-0 right-0 p-6">
+                      {getCategoryName(featuredStory.category) && (
+                        <span className="mb-3 inline-block rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white backdrop-blur">
+                          {getCategoryName(featuredStory.category)}
+                        </span>
                       )}
+                      <h3 className="text-2xl font-black leading-tight text-white sm:text-3xl">
+                        {featuredStory.title}
+                      </h3>
+                      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/80">
+                        <div className="flex items-center gap-2">
+                          <CalendarDays size={15} />
+                          {formatDate(getStoryDate(featuredStory))}
+                        </div>
+                        {featuredStory.author && (
+                          <div className="flex items-center gap-2">
+                            <Users size={15} />
+                            <span>By {featuredStory.author}</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-6">
-                  <p className="line-clamp-3 leading-7 text-gray-600">
-                    {formatExcerpt(
-                      featuredStory.excerpt || featuredStory.description
-                    ) ||
-                      "Read the latest news from Mount View International Primary School & Early Years Centre."}
-                  </p>
-                  <div className="mt-5 flex items-center gap-2 font-bold text-[#252B68]">
-                    Read story
-                    <ArrowRight
-                      size={17}
-                      className="transition-transform group-hover:translate-x-1"
-                    />
+                  <div className="p-6">
+                    <p className="line-clamp-3 leading-7 text-gray-600">
+                      {formatExcerpt(
+                        featuredStory.excerpt || featuredStory.description
+                      ) ||
+                        "Read the latest news from Mount View International Primary School & Early Years Centre."}
+                    </p>
+                    <div className="mt-5 flex items-center gap-2 font-black text-[#252B68]">
+                      Read story
+                      <ArrowRight
+                        size={17}
+                        className="transition-transform group-hover:translate-x-1"
+                      />
+                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
 
-              <div>
-                <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-xl font-black text-[#252B68]">
-                    Latest News
-                  </h3>
-                </div>
-
-                {latestStories.length === 0 ? (
-                  <div className="rounded-2xl bg-gray-50 p-8 text-center text-gray-500">
-                    More stories will appear here soon.
+                <div>
+                  <div className="mb-5 flex items-center justify-between">
+                    <h3 className="text-xl font-black text-[#252B68]">
+                      Latest News
+                    </h3>
                   </div>
-                ) : (
-                  <div className="grid gap-5 sm:grid-cols-2">
-                    {latestStories.slice(0, 6).map((story) => {
-                      const imageUrl = getImageUrl(
-                        story.image_url || story.image || story.image_path
-                      );
-                      return (
-                        <button
-                          key={story.id}
-                          type="button"
-                          onClick={() => setSelectedStory(story)}
-                          className="group overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition duration-300 hover:-translate-y-1 hover:border-[#252B68]/20 hover:shadow-xl"
-                        >
-                          <div className="relative h-40 overflow-hidden">
-                            {imageUrl ? (
-                              <Image
-                                src={imageUrl}
-                                alt={story.title}
-                                fill
-                                unoptimized
-                                className="object-cover transition duration-500 group-hover:scale-105"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#252B68]">
-                                <Newspaper size={40} className="text-white/30" />
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-                          </div>
-                          <div className="p-5">
-                            {getCategoryName(story.category) && (
-                              <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#F58220]">
-                                {getCategoryName(story.category)}
-                              </p>
-                            )}
-                            <h4 className="line-clamp-2 text-lg font-black leading-snug text-[#252B68]">
-                              {story.title}
-                            </h4>
-                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
-                              <div className="flex items-center gap-1.5">
-                                <CalendarDays size={14} />
-                                {formatShortDate(getStoryDate(story))}
-                              </div>
-                              {story.author && (
-                                <div className="flex items-center gap-1.5">
-                                  <Users size={14} />
-                                  <span>{story.author}</span>
+
+                  {latestStories.length === 0 ? (
+                    <div className="rounded-2xl bg-gray-50 p-8 text-center text-gray-500">
+                      More stories will appear here soon.
+                    </div>
+                  ) : (
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      {latestStories.slice(0, 6).map((story) => {
+                        const imageUrl = getImageUrl(
+                          story.image_url || story.image || story.image_path
+                        );
+                        return (
+                          <button
+                            key={story.id}
+                            type="button"
+                            onClick={() => setSelectedStory(story)}
+                            className="group overflow-hidden rounded-2xl border border-slate-200 bg-white text-left transition duration-300 hover:-translate-y-1 hover:border-[#252B68]/30 hover:shadow-xl"
+                          >
+                            <div className="relative h-40 overflow-hidden">
+                              {imageUrl ? (
+                                <Image
+                                  src={imageUrl}
+                                  alt={story.title}
+                                  fill
+                                  unoptimized
+                                  className="object-cover transition duration-500 group-hover:scale-105"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-[#252B68]">
+                                  <Newspaper
+                                    size={40}
+                                    className="text-white/30"
+                                  />
                                 </div>
                               )}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
                             </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                            <div className="p-5">
+                              {getCategoryName(story.category) && (
+                                <p className="mb-2 text-xs font-black uppercase tracking-wide text-[#F58220]">
+                                  {getCategoryName(story.category)}
+                                </p>
+                              )}
+                              <h4 className="line-clamp-2 text-lg font-black leading-snug text-[#252B68]">
+                                {story.title}
+                              </h4>
+                              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-gray-500">
+                                <div className="flex items-center gap-1.5">
+                                  <CalendarDays size={14} />
+                                  {formatShortDate(getStoryDate(story))}
+                                </div>
+                                {story.author && (
+                                  <div className="flex items-center gap-1.5">
+                                    <Users size={14} />
+                                    <span>{story.author}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
 
-        {/* ================= EVENTS ================= */}
-        <section className="bg-gray-50">
-          <div className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
+        {/* =====================================================
+            EVENTS
+        ====================================================== */}
+        <section
+          id="events"
+          className="relative scroll-mt-24 overflow-hidden bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24"
+        >
+          <div className="pointer-events-none absolute inset-0">
+            <div className="mv-blob absolute -left-24 top-40 h-72 w-72 rounded-full bg-[#FFE900]/20 blur-3xl" />
+            <div className="mv-blob absolute -right-24 bottom-40 h-72 w-72 rounded-full bg-[#F58220]/15 blur-3xl [animation-delay:-6s]" />
+          </div>
+
+          <span className="mv-float pointer-events-none absolute left-[4%] top-12 text-5xl opacity-15">
+            📅
+          </span>
+          <span className="mv-float-alt pointer-events-none absolute right-[4%] bottom-12 text-5xl opacity-15">
+            🎉
+          </span>
+
+          <div className="relative mx-auto max-w-7xl">
             <div className="mb-10 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
-                <p className="mb-2 text-sm font-bold uppercase tracking-[0.2em] text-[#F58220]">
+                <p className="inline-flex items-center gap-2 rounded-full bg-[#F58220]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#F58220]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
                   What&apos;s Coming Up
                 </p>
-                <h2 className="text-3xl font-black text-[#252B68] sm:text-4xl">
+                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
                   Upcoming Events
                 </h2>
-                <p className="mt-3 max-w-2xl text-gray-600">
+                <p className="mt-4 max-w-2xl leading-8 text-slate-600">
                   Mark your calendar and join us for the exciting activities
                   happening across our school community.
                 </p>
@@ -815,7 +932,7 @@ export default function NewsPage() {
                       key={event.id}
                       type="button"
                       onClick={() => setSelectedEvent(event)}
-                      className="group overflow-hidden rounded-3xl border border-gray-200 bg-white text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                      className="group overflow-hidden rounded-[2rem] border border-slate-100 bg-white text-left shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
                     >
                       <div className="relative h-52 overflow-hidden">
                         {imageUrl ? (
@@ -851,7 +968,7 @@ export default function NewsPage() {
 
                         {event.featured && (
                           <div className="absolute right-4 top-4">
-                            <span className="rounded-full bg-[#FFE900] px-3 py-1.5 text-xs font-black text-[#252B68]">
+                            <span className="rounded-full bg-[#FFE900] px-3 py-1.5 text-xs font-black text-[#252B68] shadow-lg">
                               Featured
                             </span>
                           </div>
@@ -914,7 +1031,7 @@ export default function NewsPage() {
                           )}
                         </div>
 
-                        <div className="mt-6 flex items-center gap-2 font-bold text-[#252B68]">
+                        <div className="mt-6 flex items-center gap-2 font-black text-[#252B68]">
                           View event
                           <ChevronRight
                             size={17}
@@ -930,33 +1047,75 @@ export default function NewsPage() {
           </div>
         </section>
 
-        {/* ================= SCHOOL MESSAGE ================= */}
-        <section className="mx-auto max-w-7xl px-6 py-16 sm:px-8 lg:px-10">
-          <div className="relative overflow-hidden rounded-[2rem] bg-[#252B68] px-7 py-12 sm:px-12 lg:px-16">
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#FFE900]/20 blur-3xl" />
-            <div className="absolute -bottom-24 -left-20 h-64 w-64 rounded-full bg-[#F58220]/20 blur-3xl" />
-
-            <div className="relative grid gap-8 lg:grid-cols-[1fr_auto] lg:items-center">
-              <div>
-                <p className="mb-3 text-sm font-bold uppercase tracking-[0.2em] text-[#FFE900]">
-                  Our School Community
-                </p>
-                <h2 className="max-w-3xl text-3xl font-black leading-tight text-white sm:text-4xl">
-                  Fostering growth, excellence and empathy.
-                </h2>
-                <p className="mt-4 max-w-2xl text-white/75">
-                  From classroom achievements to community celebrations, every
-                  story reflects the people who make Mount View special.
-                </p>
-              </div>
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#FFE900] px-6 py-3.5 font-black text-[#252B68] transition hover:bg-white"
-              >
-                Contact the School
-                <ArrowRight size={18} />
-              </Link>
+        {/* =====================================================
+            COMMUNITY CTA
+        ====================================================== */}
+        <section className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+          <div className="relative mx-auto max-w-5xl overflow-hidden rounded-[2rem] bg-[#252B68] p-10 text-center shadow-2xl sm:p-14">
+            <div className="pointer-events-none absolute inset-0">
+              <div className="mv-blob absolute -left-24 top-0 z-0 h-72 w-72 rounded-full bg-[#FFE900]/15 blur-3xl" />
+              <div className="mv-blob absolute -bottom-32 right-0 z-0 h-96 w-96 rounded-full bg-[#F58220]/25 blur-3xl [animation-delay:-6s]" />
             </div>
+
+            <span className="mv-float pointer-events-none absolute left-[8%] top-6 text-4xl opacity-40">
+              💬
+            </span>
+            <span className="mv-float-alt pointer-events-none absolute right-[8%] bottom-6 text-4xl opacity-40">
+              💛
+            </span>
+
+            <div className="relative z-10">
+              <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                Our School Community
+              </p>
+              <h2 className="mt-4 text-3xl font-black leading-tight text-white sm:text-4xl">
+                Fostering growth, excellence and empathy.
+              </h2>
+              <p className="mx-auto mt-5 max-w-2xl leading-8 text-blue-100">
+                From classroom achievements to community celebrations, every
+                story reflects the people who make Mount View special.
+              </p>
+              <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
+                <Link
+                  href="/contact"
+                  className="group rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-xl transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-2xl"
+                >
+                  Contact the School
+                  <span className="ml-2 inline-block transition group-hover:translate-x-1">
+                    →
+                  </span>
+                </Link>
+                <Link
+                  href="/school-life"
+                  className="rounded-full border-2 border-white/30 bg-white/10 px-8 py-4 font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
+                >
+                  Explore School Life
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* =====================================================
+            BRAND STATEMENT
+        ====================================================== */}
+        <section className="relative overflow-hidden border-t border-slate-100 bg-white px-4 py-14 text-center sm:px-6 lg:px-8">
+          <span className="mv-float pointer-events-none absolute left-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
+            ✨
+          </span>
+          <span className="mv-float-alt pointer-events-none absolute right-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
+            📰
+          </span>
+          <div className="relative mx-auto max-w-4xl">
+            <p className="text-2xl font-black text-[#252B68] sm:text-3xl">
+              Fostering <span className="text-[#F58220]">growth</span>,{" "}
+              <span className="text-[#252B68]">excellence</span> and{" "}
+              <span className="text-[#F58220]">empathy</span>.
+            </p>
+            <p className="mt-3 text-sm font-medium text-slate-500">
+              Mount View International Primary School &amp; Early Years Centre
+            </p>
           </div>
         </section>
       </main>
@@ -1283,9 +1442,6 @@ export default function NewsPage() {
         </div>
       )}
 
-      {/* =====================================================
-          GLOBAL STYLES
-      ====================================================== */}
       <style jsx global>{`
         .story-content {
           word-break: break-word;
@@ -1373,5 +1529,42 @@ export default function NewsPage() {
         }
       `}</style>
     </>
+  );
+}
+
+/* ============================================================
+ * PAGE WRAPPER
+ * ============================================================ */
+
+function NewsPageSkeleton() {
+  return (
+    <main className="min-h-screen bg-white">
+      <section className="bg-[#252B68]">
+        <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+          <div className="h-10 w-64 animate-pulse rounded-full bg-white/10" />
+          <div className="mt-6 h-16 w-full max-w-2xl animate-pulse rounded-lg bg-white/10" />
+          <div className="mt-4 h-4 w-full max-w-xl animate-pulse rounded bg-white/10" />
+        </div>
+      </section>
+      <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="h-[420px] animate-pulse rounded-3xl bg-gray-100" />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+            <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+            <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+            <div className="h-48 animate-pulse rounded-2xl bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function NewsPage() {
+  return (
+    <Suspense fallback={<NewsPageSkeleton />}>
+      <NewsPageContent />
+    </Suspense>
   );
 }

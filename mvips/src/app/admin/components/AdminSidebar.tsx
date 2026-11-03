@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Award,
   BarChart3,
   BookOpen,
   CalendarDays,
@@ -52,6 +53,7 @@ type AdminSidebarProps = {
 type NavAccess =
   | "always"
   | "cms"
+  | "alumni"
   | "academics"
   | "attendance"
   | "assessment_objectives"
@@ -114,6 +116,7 @@ const staffNavGroups: NavGroup[] = [
       { label: "Stories & News",   href: "/admin/stories",          icon: BookOpen,             access: "cms" },
       { label: "Events",           href: "/admin/events",           icon: CalendarDays,         access: "cms" },
       { label: "Gallery",          href: "/admin/gallery",          icon: GalleryHorizontalEnd, access: "cms" },
+      { label: "Alumni",           href: "/admin/alumni",           icon: Award,                access: "alumni" },
     ],
   },
   {
@@ -175,14 +178,14 @@ function buildAccessSet(role: string, caps: Caps | null): Set<NavAccess> {
 
   // ── Superusers ──
   if (["admin", "administrator", "super_admin", "superadmin"].includes(r)) {
-    (["cms", "academics", "results", "users", "student_accounts", "settings"] as NavAccess[])
+    (["cms", "alumni", "academics", "results", "users", "student_accounts", "settings"] as NavAccess[])
       .forEach((a) => set.add(a));
     return set;
   }
 
   // ── Headteacher / Principal ──
   if (["headteacher", "head_teacher", "principal"].includes(r)) {
-    (["cms", "admissions", "assessment_sheet", "student_accounts", "settings"] as NavAccess[])
+    (["cms", "alumni", "admissions", "assessment_sheet", "student_accounts", "settings"] as NavAccess[])
       .forEach((a) => set.add(a));
     return set;
   }
@@ -201,7 +204,7 @@ function buildAccessSet(role: string, caps: Caps | null): Set<NavAccess> {
     return set;
   }
 
-  // ── Specialist teacher: dynamic based on core-subject assignment ──
+  // ── Specialist teacher ──
   if (isSpecialistRole(r)) {
     if (caps?.has_core_subject_assignment) {
       (["assessment_objectives", "assessment_sheet", "settings"] as NavAccess[]).forEach((a) => set.add(a));
@@ -223,7 +226,7 @@ function buildAccessSet(role: string, caps: Caps | null): Set<NavAccess> {
     return set;
   }
 
-  // ── Parent (fallback — normally handled before this runs) ──
+  // ── Parent ──
   if (["parent", "guardian"].includes(r)) {
     return set;
   }
@@ -267,7 +270,6 @@ function getInitials(name?: string) {
 
 function isActivePath(pathname: string | null, href: string): boolean {
   if (!pathname) return false;
-  // Exact-match only for dashboards (so /admin/parent doesn't highlight on /admin/parent/children/5)
   if (href === "/admin" || href === "/admin/parent") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -317,12 +319,7 @@ function buildParentNav(children: Child[]): NavGroup[] {
       key: "parent_children",
       label: "My Children",
       items: [
-        {
-          label: "No children linked",
-          href: "/admin/parent",
-          icon: UserCircle,
-          access: "always",
-        },
+        { label: "No children linked", href: "/admin/parent", icon: UserCircle, access: "always" },
       ],
     });
   }
@@ -356,7 +353,6 @@ export default function AdminSidebar({
   const [loggingOut, setLoggingOut] = useState(false);
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null);
 
-  /* ---------- Bootstrap: localStorage user ---------- */
   useEffect(() => {
     try {
       const stored = localStorage.getItem("admin_user");
@@ -366,7 +362,6 @@ export default function AdminSidebar({
     }
   }, []);
 
-  /* ---------- Fetch capabilities (+ children for parents) ---------- */
   useEffect(() => {
     let cancelled = false;
 
@@ -403,7 +398,7 @@ export default function AdminSidebar({
           }
         }
       } catch {
-        /* Capabilities endpoint unreachable — fallback to localStorage role */
+        /* fallback */
       } finally {
         if (!cancelled) setMetaLoading(false);
       }
@@ -414,12 +409,10 @@ export default function AdminSidebar({
     };
   }, [router]);
 
-  /* ---------- Derived role / parent state ---------- */
   const effectiveRole = caps?.role || user?.role || "";
   const isParent = !!caps?.is_parent ||
     ["parent", "guardian"].includes(normalise(user?.role || ""));
 
-  /* ---------- Build nav ---------- */
   const visibleGroups: NavGroup[] = useMemo(() => {
     if (!effectiveRole) return [];
 
@@ -427,7 +420,6 @@ export default function AdminSidebar({
       return buildParentNav(children);
     }
 
-    // Staff: hide until caps loaded (prevents flash of wrong items for specialists)
     if (metaLoading && !caps) return [];
 
     const allowed = buildAccessSet(effectiveRole, caps);
@@ -440,7 +432,6 @@ export default function AdminSidebar({
       .filter((group) => group.items.length > 0);
   }, [effectiveRole, isParent, children, caps, metaLoading]);
 
-  /* ---------- Auto-open the group containing the active route ---------- */
   useEffect(() => {
     if (visibleGroups.length === 0) {
       setOpenGroupKey(null);
@@ -487,7 +478,6 @@ export default function AdminSidebar({
     }
   };
 
-  /* ---------- Item renderer ---------- */
   const renderItem = (item: NavItem, mobile = false) => {
     const active = isActivePath(pathname, item.href);
     const Icon = item.icon;
@@ -521,7 +511,6 @@ export default function AdminSidebar({
     );
   };
 
-  /* ---------- Group renderer ---------- */
   const renderGroup = (group: NavGroup, mobile = false) => {
     const isOpen = openGroupKey === group.key;
     const containsActive = group.items.some((i) => isActivePath(pathname, i.href));
@@ -562,7 +551,6 @@ export default function AdminSidebar({
   };
 
   const renderGroupOrItem = (group: NavGroup, mobile = false) => {
-    // Single-item groups render as a flat link
     if (group.items.length === 1) {
       return (
         <div key={group.key} className="mt-1">
@@ -573,10 +561,8 @@ export default function AdminSidebar({
     return renderGroup(group, mobile);
   };
 
-  /* ---------- Sidebar body ---------- */
   const sidebarContent = (mobile = false) => (
     <div className="flex min-h-full flex-col">
-      {/* Brand */}
       <div className="px-4 pb-4 pt-4">
         <Link
           href={isParent ? "/admin/parent" : "/admin"}
@@ -609,7 +595,6 @@ export default function AdminSidebar({
 
       <div className="mx-4 border-t border-white/10" />
 
-      {/* Home + groups */}
       <div className="flex-1 px-3 pt-4">
         {renderItem(isParent ? HOME_ITEM_PARENT : HOME_ITEM_STAFF, mobile)}
 
@@ -634,7 +619,6 @@ export default function AdminSidebar({
         )}
       </div>
 
-      {/* Website shortcut */}
       <div className="px-3 pb-3 pt-4">
         <div className="rounded-xl border border-white/10 bg-white/5 p-2.5">
           <div className="flex items-center gap-2.5">
@@ -657,7 +641,6 @@ export default function AdminSidebar({
         </div>
       </div>
 
-      {/* User + logout */}
       <div className="border-t border-white/10 px-3 py-3">
         <div className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FFE900] text-xs font-extrabold text-[#252B68]">
@@ -689,7 +672,6 @@ export default function AdminSidebar({
 
   return (
     <>
-      {/* Desktop */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] bg-[#171B4A] lg:block">
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#252B68] via-[#171B4A] to-[#101335]" />
         <div className="relative h-full overflow-y-auto overscroll-contain">
@@ -697,7 +679,6 @@ export default function AdminSidebar({
         </div>
       </aside>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <button
           type="button"
@@ -707,7 +688,6 @@ export default function AdminSidebar({
         />
       )}
 
-      {/* Mobile drawer */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#171B4A] shadow-2xl transition-transform duration-300 lg:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"

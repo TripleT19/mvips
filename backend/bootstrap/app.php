@@ -40,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'administrator'  => AdministratorMiddleware::class,
             'admission.role' => AdmissionRoleMiddleware::class,
             'bursar.role'    => EnsureBursar::class,
+            'alumni-approver'  => \App\Http\Middleware\AlumniApproverMiddleware::class,
         ]);
 
         // If your front-end uses Sanctum cookie (SPA) auth:
