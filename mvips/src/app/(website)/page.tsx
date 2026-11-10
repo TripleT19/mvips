@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import ImageWithFallback from "../components/ImageWithFallback";
 
@@ -51,9 +52,6 @@ type GalleryItem = {
   images: GalleryImage[];
 };
 
-/* ---------------------------------------------------------
-   Robust array extractor
---------------------------------------------------------- */
 function extractArray<T = unknown>(payload: unknown): T[] {
   if (!payload) return [];
   const p = payload as Record<string, unknown>;
@@ -65,7 +63,14 @@ function extractArray<T = unknown>(payload: unknown): T[] {
 
   if (Array.isArray(p.data)) return p.data as T[];
 
-  for (const key of ["events", "stories", "galleries", "gallery", "items", "results"]) {
+  for (const key of [
+    "events",
+    "stories",
+    "galleries",
+    "gallery",
+    "items",
+    "results",
+  ]) {
     const value = p[key];
     if (Array.isArray(value)) return value as T[];
   }
@@ -88,7 +93,43 @@ async function fetchJson(path: string): Promise<unknown> {
       return null;
     }
 
-    return await res.json();
+    const contentType = res.headers.get("content-type") || "";
+
+    let text: string;
+    try {
+      text = await res.text();
+    } catch (readErr) {
+      console.error(`[home] GET ${url} — failed to read body:`, readErr);
+      return null;
+    }
+
+    const trimmed = text.trimStart();
+
+    if (trimmed.startsWith("<")) {
+      console.error(
+        `[home] GET ${url} returned HTML instead of JSON ` +
+          `(content-type: "${contentType}"). Check that NEXT_PUBLIC_API_URL ` +
+          `points to your backend and that the endpoint returns JSON. ` +
+          `First 120 chars: ${text.slice(0, 120)}`
+      );
+      return null;
+    }
+
+    if (!trimmed) {
+      console.error(`[home] GET ${url} returned an empty body`);
+      return null;
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (parseErr) {
+      console.error(
+        `[home] GET ${url} returned invalid JSON (content-type: "${contentType}"). ` +
+          `First 120 chars: ${text.slice(0, 120)}`,
+        parseErr
+      );
+      return null;
+    }
   } catch (err) {
     console.error(`[home] GET ${url} failed:`, err);
     return null;
@@ -149,45 +190,43 @@ function formatEventDate(value: string | null | undefined): string {
 }
 
 /* =========================================================
+   SHARED BRAND VALUES
+========================================================= */
+
+const BRAND_VALUES = [
+  "Integrity",
+  "Inclusion",
+  "Responsibility",
+  "Respect",
+  "Collaboration",
+  "Well-being",
+  "Confidence",
+  "Empathy",
+];
+
+/* =========================================================
    STATIC BRAND CONTENT
 ========================================================= */
 
+/* Two grouped Cambridge stages — hrefs deep-link to /academics anchors */
 const stageHighlights = [
   {
     number: "01",
-    title: "Early Years",
-    years: "Pre-Nursery · Nursery · Reception",
+    title: "Cambridge Early Years",
+    years: "Pre-Nursery · Nursery · Reception · 18 months – 5 years",
     description:
-      "A joyful first step (20 months – 5 years). We follow the British EYFS framework, blending play-based learning with specialist subjects like ICT, Swimming, PE, Art, and Music.",
+      "A joyful first step. We follow the Cambridge Early Years framework, blending play-based learning with specialist subjects such as ICT, Swimming, PE, Art and Music — building curiosity, confidence and a love of learning from the very start.",
     image: "/images/ey.jpg",
-    href: "/academics",
+    href: "/academics#early-years",
   },
   {
     number: "02",
-    title: "Key Stage 1",
-    years: "Year 1 & Year 2",
+    title: "Cambridge Primary",
+    years: "Year 1 · Year 2 · Year 3 · Year 4 · Year 5 · Year 6",
     description:
-      "Building strong foundations in English (including Phonics) and Maths. Learning is enriched with Global Perspectives, ICT, Art, Music, and PE through topic-themed lessons.",
+      "A strong foundation for lifelong learning. Students build deep knowledge in English (including Phonics) and Mathematics, enriched with Science, Global Perspective, ICT, Art, Music and PE. Year 6 students sit the Cambridge Checkpoint examinations, prepared with confidence for secondary school.",
     image: "/images/ks1.jpg",
-    href: "/academics",
-  },
-  {
-    number: "03",
-    title: "Lower Key Stage 2",
-    years: "Year 3 & Year 4",
-    description:
-      "Broadening the learning experience with Science, Global Perspectives, Art, and Music, alongside core English and Mathematics. Curriculum links provide real-world contexts.",
-    image: "/images/ict.JPG",
-    href: "/academics",
-  },
-  {
-    number: "04",
-    title: "Upper Key Stage 2",
-    years: "Year 5 & Year 6",
-    description:
-      "Preparing for secondary school. Students take greater responsibility for their learning, developing critical thinking skills meticulously aligned for Cambridge Checkpoint exams.",
-    image: "/images/uks.JPG",
-    href: "/academics",
+    href: "/academics#primary",
   },
 ];
 
@@ -201,25 +240,25 @@ const learningAreas = [
   {
     title: "Jolly Phonics",
     description:
-      "A multi-sensory synthetic phonics method used in Reception to get children reading and writing from an early age.",
+      "A multi-sensory synthetic phonics method used in Early Years and Key Stage 1 to get children reading and writing from an early age.",
     icon: "🔤",
   },
   {
     title: "Clubs & Field Trips",
     description:
-      "From ICT, Art, and Music to Dance and Drama. Plus trips to Game Haven for Year 6 team building and independence.",
+      "From ICT, Art and Music to Dance and Drama — plus fun and educational trips that enrich learning beyond the classroom.",
     icon: "◈",
   },
   {
     title: "Swimming & Sports",
     description:
-      "Two on-campus pools. All Year 1-6 students participate in swim lessons between September and March with 3 lifeguards.",
+      "Two on-campus pools. All Reception to Year 6 students participate in swim lessons between September and March, led by a swimming coach and lifeguard, supported by Teaching Assistants.",
     icon: "⚽",
   },
   {
     title: "The House System",
     description:
-      "Fostering camaraderie through four Houses: Red Chipembere, Green Njobvu, Yellow Swala, and Blue Mbidzi.",
+      "Fostering camaraderie through four Houses: Sunbird House, Baobab House, Eagle House, and Lake House.",
     icon: "🛡️",
   },
   {
@@ -259,37 +298,37 @@ const journey = [
     title: "Discover",
     description:
       "Children are encouraged to ask questions, explore their interests, and discover the world around them.",
+    accent: "bg-[#F58220]",
   },
   {
     step: "02",
     title: "Develop",
     description:
       "Learners build knowledge, skills, confidence, and positive learning habits.",
+    accent: "bg-[#FFE900]",
   },
   {
     step: "03",
     title: "Create",
     description:
       "Learners use their knowledge and imagination to solve problems, communicate ideas, and create.",
+    accent: "bg-[#F58220]",
   },
   {
     step: "04",
     title: "Thrive",
     description:
       "Learners grow in independence and confidence as they prepare for the opportunities ahead.",
+    accent: "bg-[#FFE900]",
   },
 ];
 
-/* ---------------------------------------------------------
-   Subjects shown in the animated ribbon
-   (duplicated 2× so the marquee loops seamlessly)
---------------------------------------------------------- */
 const SUBJECTS_RIBBON = [
   "English",
   "Mathematics",
   "Science",
   "Jolly Phonics",
-  "Global Perspectives",
+  "Global Perspective",
   "ICT & Computing",
   "Art & Design",
   "Music",
@@ -304,6 +343,71 @@ const SUBJECTS_RIBBON = [
 ];
 
 /* =========================================================
+   HERO SLIDESHOW — CSS-only, server-safe
+========================================================= */
+
+const FALLBACK_HERO_IMAGES = [
+  "/images/school1.jpg",
+  "/images/council.jpg",
+  "/images/gardening.jpg",
+  "/images/ks1.jpg",
+  "/images/ey.jpg",
+];
+
+const HERO_BUTTONS = [
+  { href: "/admissions", label: "Apply for Admissions" },
+  { href: "/school-life", label: "School Life" },
+  { href: "/about", label: "About Us" },
+];
+
+const QUICK_NAV_CARDS = [
+  {
+    href: "/about",
+    index: "01",
+    title: "About Us",
+    desc: "Discover our school, values and story since 1968.",
+    cardClass: "bg-[#252B68] hover:bg-[#1a1d4d]",
+    indexClass: "text-[#FFE900]",
+    titleClass: "text-white",
+    descClass: "text-blue-100",
+    accentClass: "text-[#FFE900]",
+  },
+  {
+    href: "/academics",
+    index: "02",
+    title: "Academics",
+    desc: "Explore learning, curriculum and classrooms.",
+    cardClass: "bg-[#F58220] hover:bg-[#d96e12]",
+    indexClass: "text-white",
+    titleClass: "text-white",
+    descClass: "text-white/95",
+    accentClass: "text-white",
+  },
+  {
+    href: "/school-life",
+    index: "03",
+    title: "School Life",
+    desc: "See how learners experience every school day.",
+    cardClass: "bg-[#FFE900] hover:bg-[#e6d200]",
+    indexClass: "text-[#252B68]",
+    titleClass: "text-[#252B68]",
+    descClass: "text-[#252B68]/80",
+    accentClass: "text-[#252B68]",
+  },
+  {
+    href: "/gallery",
+    index: "04",
+    title: "Gallery",
+    desc: "Browse moments captured across Mount View.",
+    cardClass: "bg-[#171B4A] hover:bg-[#0f1235]",
+    indexClass: "text-[#FFE900]",
+    titleClass: "text-white",
+    descClass: "text-blue-100",
+    accentClass: "text-[#FFE900]",
+  },
+];
+
+/* =========================================================
    PAGE
 ========================================================= */
 
@@ -315,11 +419,23 @@ export default async function Home() {
   ]);
 
   const featuredStory = stories[0] ?? null;
-  const secondaryStory = stories[1] ?? null;
   const featuredEvent = events[0] ?? null;
-
   const featuredGallery = galleries[0] ?? null;
-  const heroGallery = galleries[1] ?? galleries[0] ?? null;
+
+  const heroSlides: string[] = (() => {
+    const fromApi = galleries
+      .flatMap((g) => [
+        resolveImageUrl(g.cover_image),
+        ...(g.images ?? [])
+          .slice(0, 2)
+          .map((img) => resolveImageUrl(img.image_url)),
+      ])
+      .filter(Boolean);
+
+    return Array.from(
+      new Set([...fromApi, ...FALLBACK_HERO_IMAGES].filter(Boolean))
+    ).slice(0, 5);
+  })();
 
   const galleryPreviewImages = (featuredGallery?.images ?? [])
     .slice(0, 5)
@@ -329,20 +445,19 @@ export default async function Home() {
     }))
     .filter((img) => img.url);
 
-  const heroImage =
-    resolveImageUrl(heroGallery?.cover_image) || "/images/school1.jpg";
-
   const schoolLifeImage =
-    resolveImageUrl(featuredGallery?.cover_image) || "/images/school-3.jpg";
+    resolveImageUrl(featuredGallery?.cover_image) || "/images/team-spirit.JPG";
 
   const hasNews =
-    Boolean(featuredStory) ||
-    Boolean(featuredEvent) ||
-    Boolean(featuredGallery);
+    Boolean(featuredStory) || Boolean(featuredEvent) || Boolean(featuredGallery);
+
+  const heroCycle = "30s";
 
   return (
     <main className="bg-white text-[#172033]">
-      {/* ---------- shared animation styles ---------- */}
+      {/* =========================================================
+          SHARED ANIMATION STYLES
+      ========================================================== */}
       <style>{`
         @keyframes mv-marquee {
           from { transform: translateX(0); }
@@ -351,180 +466,120 @@ export default async function Home() {
         .mv-marquee { animation: mv-marquee 40s linear infinite; }
         .mv-marquee:hover { animation-play-state: paused; }
 
+        @keyframes mv-hero-slide {
+          0%   { opacity: 0; transform: scale(1); }
+          4%   { opacity: 1; }
+          20%  { opacity: 1; transform: scale(1.06); }
+          24%  { opacity: 0; transform: scale(1.06); }
+          100% { opacity: 0; transform: scale(1); }
+        }
+        .mv-hero-slide {
+          animation-name: mv-hero-slide;
+          animation-duration: ${heroCycle};
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+          opacity: 0;
+          will-change: opacity, transform;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .mv-marquee { animation: none; }
+          .mv-hero-slide { animation: none !important; opacity: 0; }
+          .mv-hero-slide:first-child { opacity: 1; }
         }
       `}</style>
 
       {/* =========================================================
           HERO
       ========================================================== */}
-      <section className="relative overflow-hidden bg-[#252B68]">
-        <div className="pointer-events-none absolute -right-40 -top-40 h-[32rem] w-[32rem] rounded-full bg-[#FFE900]/10" />
-        <div className="pointer-events-none absolute -bottom-48 -left-40 h-[32rem] w-[32rem] rounded-full bg-[#F58220]/10" />
-
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-14 sm:px-6 sm:py-20 lg:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-24">
-          <div className="order-2 lg:order-1">
-            <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-[#FFE900]">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#FFE900]" />
-              Established in 1975
+      <section className="relative isolate flex min-h-[88svh] flex-col items-center justify-center overflow-hidden bg-[#0B0F2E]">
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          {heroSlides.map((src, i) => (
+            <div
+              key={`${src}-${i}`}
+              className="mv-hero-slide absolute inset-0"
+              style={{ animationDelay: `${i * 6}s` }}
+            >
+              <Image
+                src={src}
+                alt=""
+                fill
+                sizes="100vw"
+                priority={i === 0}
+                className="object-cover"
+                style={{ filter: "brightness(1.08) saturate(1.05)" }}
+              />
             </div>
+          ))}
 
-            <h1 className="max-w-3xl text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl">
-              A place where children{" "}
-              <span className="text-[#FFE900]">learn, grow and thrive.</span>
-            </h1>
+          <div className="absolute inset-0 bg-[#0B0F2E]/25" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0B0F2E]/55 via-[#0B0F2E]/15 to-[#0B0F2E]/80" />
+        </div>
 
-            <p className="mt-7 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
-              At Mount View, we see learning as more than just an academic
-              pursuit—it is a lifelong adventure filled with discovery,
-              creativity, and joy.
-            </p>
-
-            <p className="mt-4 max-w-xl text-base leading-7 text-white/75">
-              As a vibrant mosaic of cultures, we are dedicated to nurturing not
-              only the minds but also the hearts of our students, instilling in
-              them the confidence, curiosity, and passion to pursue their
-              dreams.
-            </p>
-
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/admissions"
-                className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-7 py-4 font-black text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
-              >
-                Apply for Admission
-                <span className="ml-2">→</span>
-              </Link>
-
-              <Link
-                href="/about"
-                className="inline-flex items-center justify-center rounded-full border-2 border-white/30 px-7 py-4 font-bold text-white transition duration-300 hover:bg-white hover:text-[#252B68]"
-              >
-                Discover Mount View
-              </Link>
-            </div>
-
-            <div className="mt-9 grid max-w-xl grid-cols-3 gap-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">1975</p>
-                <p className="mt-1 text-xs font-semibold text-blue-100">
-                  Established
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">600+</p>
-                <p className="mt-1 text-xs font-semibold text-blue-100">
-                  Students
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <p className="text-2xl font-black text-[#FFE900]">4</p>
-                <p className="mt-1 text-[11px] font-semibold leading-tight text-blue-100">
-                  Stages (Early Years → Year 6)
-                </p>
-              </div>
-            </div>
+        <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center px-4 py-20 text-center sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+          <div className="inline-flex items-center gap-3 rounded-full border border-white/30 bg-white/15 px-5 py-2.5 backdrop-blur-md">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-[#FFE900]" />
+            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-white sm:text-[11px]">
+              Learn · Grow · Excel · Care
+            </span>
           </div>
 
-          <div className="order-1 lg:order-2">
-            <div className="relative isolate">
-              <div className="pointer-events-none absolute -inset-3 z-0 rounded-[2.5rem] bg-[#FFE900]/15 blur-2xl" />
+          <h1 className="mt-8 text-4xl font-black leading-[1.04] tracking-tight text-white [text-shadow:0_2px_30px_rgba(0,0,0,0.65),0_1px_3px_rgba(0,0,0,0.55)] sm:text-5xl lg:text-6xl xl:text-7xl">
+            <span className="block text-white/90">Welcome to</span>
+            <span className="mt-1 block">Mount View International</span>
+            <span className="mt-1 block text-[#FFE900] [text-shadow:0_2px_30px_rgba(0,0,0,0.75),0_1px_3px_rgba(0,0,0,0.7)]">
+              Primary School
+            </span>
+          </h1>
 
-              <div className="relative z-10 overflow-hidden rounded-[2rem] border-[10px] border-white/10 bg-[#171B4A] shadow-2xl ring-1 ring-white/10">
-                <div className="relative">
-                  <ImageWithFallback
-                    src={heroImage}
-                    alt="Learners enjoying school life at Mount View International Primary School"
-                    className="aspect-[4/5] w-full sm:aspect-[4/3]"
-                  />
+          <p className="mt-5 text-2xl font-black tracking-wide text-[#FFE900] [text-shadow:0_2px_30px_rgba(0,0,0,0.75),0_1px_3px_rgba(0,0,0,0.7)] sm:text-3xl lg:text-4xl">
+            &amp; Early Years Centre
+          </p>
 
-                  <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/55 to-transparent" />
+          <div className="mx-auto my-8 h-px w-24 bg-white/30" />
 
-                  <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-lg">
-                    <span className="h-2 w-2 animate-pulse rounded-full bg-[#F58220]" />
-                    Applications open
-                  </div>
+          <p className="mx-auto max-w-2xl text-lg leading-8 text-blue-50 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)] sm:text-xl">
+            For nearly five decades, Mount View has delivered a distinctive
+            British–Cambridge education — nurturing curious minds, shaping
+            character, and preparing children for a lifetime of learning.
+          </p>
 
-                  <div className="absolute right-4 top-4 z-20 rounded-full border border-white/25 bg-black/35 px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white backdrop-blur-md">
-                    Cambridge Curriculum
-                  </div>
+          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">
+            Growing minds. Inspiring futures. Blantyre, Malawi.
+          </p>
 
-                  <div className="absolute inset-x-0 bottom-0 z-20 p-5 sm:p-6">
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4 backdrop-blur-md sm:p-5">
-                      <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#FFE900]">
-                        Mount View International
-                      </p>
+          <div className="mt-10 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
+            {HERO_BUTTONS.map((btn, index) => {
+              const isPrimary = index === 0;
 
-                      <p className="mt-1.5 text-lg font-black leading-snug text-white sm:text-xl">
-                        Primary School & Early Years Centre
-                      </p>
-
-                      <p className="mt-2 text-sm leading-6 text-white/85">
-                        A vibrant community of 600+ learners from Malawi and
-                        around the world — growing, discovering and thriving
-                        together.
-                      </p>
-
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        <Link
-                          href="/admissions"
-                          className="inline-flex items-center gap-2 rounded-full bg-[#F58220] px-4 py-2 text-xs font-black text-white transition hover:bg-[#d96e12]"
-                        >
-                          Apply for Admission
-                          <span>→</span>
-                        </Link>
-
-                        <Link
-                          href="/about"
-                          className="inline-flex items-center gap-2 rounded-full border border-white/25 px-4 py-2 text-xs font-black text-white transition hover:bg-white hover:text-[#252B68]"
-                        >
-                          Why Mount View
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="absolute -right-3 top-1/3 z-20 hidden -translate-y-1/2 rotate-[6deg] rounded-xl bg-[#F58220] px-4 py-3 shadow-2xl lg:block">
-                <p className="text-[10px] font-black uppercase tracking-widest text-white/85">
-                  Enrolling
-                </p>
-                <p className="text-sm font-black text-white">
-                  Early Years → Year 6
-                </p>
-              </div>
-
-              <div className="absolute -bottom-5 -right-3 z-20 hidden items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-2xl lg:flex">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#252B68] text-lg text-[#FFE900]">
-                  ♡
-                </div>
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                    Our values
-                  </p>
-                  <p className="text-xs font-black text-[#252B68]">
-                    Growth · Excellence · Empathy
-                  </p>
-                </div>
-              </div>
-            </div>
+              return (
+                <Link
+                  key={btn.href}
+                  href={btn.href}
+                  className={
+                    isPrimary
+                      ? "inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-lg transition duration-300 hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
+                      : "inline-flex items-center justify-center rounded-full border-2 border-white/40 bg-white/10 px-8 py-4 font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
+                  }
+                >
+                  {btn.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
+
+        <div className="absolute bottom-0 left-0 right-0 z-10 h-1.5 bg-[#FFE900]" />
       </section>
 
       {/* =========================================================
-          SUBJECTS RIBBON — animated marquee
+          SUBJECTS RIBBON
       ========================================================== */}
       <section
         aria-label="Subjects taught at Mount View"
         className="overflow-hidden border-y border-slate-200 bg-white py-4"
       >
         <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
-          {/* Render the list twice for a seamless loop */}
           {[...SUBJECTS_RIBBON, ...SUBJECTS_RIBBON].map((subject, i) => (
             <span
               key={`${subject}-${i}`}
@@ -538,39 +593,36 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          SCHOOL INTRODUCTION
+          INTRODUCTION
       ========================================================== */}
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#F58220]">
-            Welcome to Mount View
-          </p>
+      <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto grid max-w-[1250px] gap-12 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="mb-4 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
+              Our School
+            </p>
 
-          <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl lg:text-5xl">
-            A vibrant community built around children.
-          </h2>
+            <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
+              A place where
+              <br />
+              <span className="text-[#F58220]">every child matters.</span>
+            </h2>
+          </div>
 
-          <p className="mx-auto mt-6 max-w-4xl text-lg leading-8 text-slate-600">
-            We are honored to have your children as part of our school
-            community, where their happiness, growth, and success are at the
-            heart of everything we do. Our teaching approach is personalised to
-            ensure that every student&apos;s learning journey is as special as
-            they are.
-          </p>
+          <div>
+            <p className="text-base leading-8 text-slate-600">
+              We believe that every child has unique talents, abilities and
+              potential. At Mount View, we provide an engaging, supportive and
+              stimulating environment where learners develop academically,
+              socially and emotionally.
+            </p>
 
-          <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row">
             <Link
               href="/about"
-              className="rounded-full bg-[#252B68] px-7 py-3.5 font-bold text-white transition hover:bg-[#171B4A]"
+              className="mt-6 inline-flex items-center gap-2 text-sm font-black text-[#252B68] hover:text-[#F58220]"
             >
-              Learn More About Us
-            </Link>
-
-            <Link
-              href="/contact"
-              className="rounded-full border-2 border-[#252B68] px-7 py-3.5 font-bold text-[#252B68] transition hover:bg-[#252B68] hover:text-white"
-            >
-              Talk to Our School
+              More About Mount View
+              <span aria-hidden>→</span>
             </Link>
           </div>
         </div>
@@ -579,8 +631,8 @@ export default async function Home() {
       {/* =========================================================
           SCHOOL AT A GLANCE
       ========================================================== */}
-      <section className="bg-slate-50 py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="bg-slate-50 px-6 py-16 sm:px-10 sm:py-20 lg:px-16">
+        <div className="mx-auto max-w-[1250px]">
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="rounded-3xl bg-white p-7 text-center shadow-sm ring-1 ring-slate-100">
               <p className="text-4xl font-black text-[#252B68]">1975</p>
@@ -610,8 +662,8 @@ export default async function Home() {
                 Distinct Learning Stages
               </p>
               <p className="mt-3 text-sm leading-6 text-[#252B68]/70">
-                Supporting children through Early Years, KS1, Lower KS2, and
-                Upper KS2.
+                Supporting children through Early Years, Key Stage 1, Lower
+                Key Stage 2 and Upper Key Stage 2.
               </p>
             </div>
           </div>
@@ -619,68 +671,81 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          STAGES HIGHLIGHTS
+          OUR STAGES — 2 grouped cards, deep-linked to /academics anchors
       ========================================================== */}
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl">
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
-              Our Stages
-            </p>
+      <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto max-w-[1250px]">
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+            <div className="max-w-2xl">
+              <p className="mb-3 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
+                Our Stages
+              </p>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
-              A learning journey designed around the child.
-            </h2>
+              <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
+                Two Cambridge stages. One continuous journey.
+              </h2>
+            </div>
 
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              From the first steps in Early Years to confident learners in Year
-              6, every stage of the Mount View journey is designed around what
-              children need to flourish.
+            <p className="max-w-sm text-sm leading-7 text-slate-500">
+              Every learner moves through Cambridge Early Years into Cambridge
+              Primary — building confidence, knowledge and independence along
+              the way.
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {stageHighlights.map((item) => (
-              <article
-                key={item.number}
-                className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-xl"
-              >
-                <div className="relative isolate">
-                  <ImageWithFallback
-                    src={item.image}
-                    alt={item.title}
-                    className="aspect-[16/10] w-full"
-                  />
-                  <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-                  <span className="absolute left-4 top-4 z-20 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-md">
-                    {item.number}
-                  </span>
-                </div>
+          <div className="grid gap-6 md:grid-cols-2">
+            {stageHighlights.map((item, index) => {
+              const isOrange = index % 2 === 1;
 
-                <div className="p-6">
-                  <p className="text-xs font-bold text-[#F58220] uppercase tracking-wider mb-2">
-                    {item.years}
-                  </p>
-                  <h3 className="text-xl font-black text-[#252B68]">
-                    {item.title}
-                  </h3>
-
-                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {item.description}
-                  </p>
-
-                  <Link
-                    href={item.href}
-                    className="mt-5 inline-flex text-sm font-bold text-[#252B68] transition hover:text-[#F58220]"
-                  >
-                    Discover this stage
-                    <span className="ml-2 transition group-hover:translate-x-1">
-                      →
+              return (
+                <article
+                  key={item.number}
+                  className="group overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-xl"
+                >
+                  <div className="relative isolate">
+                    <ImageWithFallback
+                      src={item.image}
+                      alt={item.title}
+                      className="aspect-[16/9] w-full"
+                    />
+                    <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                    <span
+                      className={
+                        isOrange
+                          ? "absolute left-5 top-5 z-20 inline-flex items-center rounded-full bg-[#F58220] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-white shadow-md"
+                          : "absolute left-5 top-5 z-20 inline-flex items-center rounded-full bg-[#FFE900] px-3.5 py-1.5 text-[11px] font-black uppercase tracking-wider text-[#252B68] shadow-md"
+                      }
+                    >
+                      {item.number}
                     </span>
-                  </Link>
-                </div>
-              </article>
-            ))}
+                  </div>
+
+                  <div className="p-7 sm:p-8">
+                    <p className="mb-2 text-xs font-bold uppercase tracking-wider text-[#F58220]">
+                      {item.years}
+                    </p>
+
+                    <h3 className="text-2xl font-black text-[#252B68] sm:text-3xl">
+                      {item.title}
+                    </h3>
+
+                    <p className="mt-4 text-sm leading-7 text-slate-600 sm:text-base">
+                      {item.description}
+                    </p>
+
+                    <Link
+                      href={item.href}
+                      className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[#252B68] transition hover:text-[#F58220]"
+                    >
+                      Discover this stage
+                      <span className="transition group-hover:translate-x-1">
+                        →
+                      </span>
+                    </Link>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -688,8 +753,8 @@ export default async function Home() {
       {/* =========================================================
           WHY MOUNT VIEW
       ========================================================== */}
-      <section className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8">
+      <section className="bg-slate-50 px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto grid max-w-[1250px] gap-14 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div className="relative isolate">
             <div className="overflow-hidden rounded-[2rem] shadow-2xl">
               <ImageWithFallback
@@ -699,26 +764,27 @@ export default async function Home() {
               />
             </div>
 
-            <div className="absolute -bottom-6 -right-3 z-20 rounded-2xl bg-[#FFE900] px-5 py-4 shadow-2xl sm:-right-7">
+            <div className="absolute -bottom-6 -right-3 z-20 max-w-[280px] rounded-2xl bg-[#FFE900] px-5 py-4 shadow-2xl sm:-right-7">
               <p className="text-xs font-black uppercase tracking-wider text-[#252B68]">
                 Our values
               </p>
-              <p className="mt-1 font-black text-[#252B68]">
-                Growth • Excellence • Empathy
+              <p className="mt-1.5 text-sm font-bold leading-snug text-[#252B68]">
+                Integrity · Inclusion · Responsibility · Respect ·
+                Collaboration · Well-being · Confidence · Empathy
               </p>
             </div>
           </div>
 
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+            <p className="mb-4 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
               Why Mount View
             </p>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+            <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
               Helping every learner discover their potential.
             </h2>
 
-            <p className="mt-6 text-lg leading-8 text-slate-600">
+            <p className="mt-6 text-base leading-8 text-slate-600">
               We want children to develop not only what they know, but also how
               they think, communicate, collaborate, and respond to new
               challenges.
@@ -758,14 +824,14 @@ export default async function Home() {
       {/* =========================================================
           LEARNING AREAS
       ========================================================== */}
-      <section className="bg-[#252B68] py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="bg-[#252B68] px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto max-w-[1250px]">
           <div className="mx-auto max-w-3xl text-center">
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-[#FFE900]">
+            <p className="mb-3 text-xs font-black uppercase tracking-[3px] text-[#FFE900]">
               Learning at Mount View
             </p>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">
+            <h2 className="text-4xl font-black leading-tight text-white sm:text-5xl">
               Learning that goes beyond the textbook.
             </h2>
 
@@ -776,24 +842,34 @@ export default async function Home() {
           </div>
 
           <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {learningAreas.map((area) => (
-              <div
-                key={area.title}
-                className="group rounded-3xl border border-white/10 bg-white/5 p-7 transition duration-300 hover:-translate-y-1 hover:bg-white/10"
-              >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-xl font-black text-[#252B68] transition group-hover:bg-[#F58220] group-hover:text-white">
-                  {area.icon}
+            {learningAreas.map((area, index) => {
+              const isOrange = index % 2 === 1;
+
+              return (
+                <div
+                  key={area.title}
+                  className="group rounded-3xl border border-white/10 bg-white/5 p-7 transition duration-300 hover:-translate-y-1 hover:bg-white/10"
+                >
+                  <div
+                    className={
+                      isOrange
+                        ? "flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F58220] text-xl font-black text-white transition group-hover:bg-white group-hover:text-[#252B68]"
+                        : "flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-xl font-black text-[#252B68] transition group-hover:bg-white group-hover:text-[#252B68]"
+                    }
+                  >
+                    {area.icon}
+                  </div>
+
+                  <h3 className="mt-6 text-xl font-black text-white">
+                    {area.title}
+                  </h3>
+
+                  <p className="mt-3 leading-7 text-blue-100">
+                    {area.description}
+                  </p>
                 </div>
-
-                <h3 className="mt-6 text-xl font-black text-white">
-                  {area.title}
-                </h3>
-
-                <p className="mt-3 leading-7 text-blue-100">
-                  {area.description}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-10 text-center">
@@ -810,14 +886,14 @@ export default async function Home() {
       {/* =========================================================
           LEARNER JOURNEY
       ========================================================== */}
-      <section className="bg-slate-50 py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+      <section className="bg-slate-50 px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto max-w-[1250px]">
+          <div className="mb-14 text-center">
+            <p className="mb-3 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
               The Learner Journey
             </p>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+            <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
               From discovery to confidence.
             </h2>
 
@@ -828,25 +904,29 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="relative mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <div className="relative grid gap-5 md:grid-cols-2 lg:grid-cols-4">
             {journey.map((item, index) => (
               <div
                 key={item.step}
-                className="relative rounded-3xl bg-white p-7 shadow-sm ring-1 ring-slate-100"
+                className="relative overflow-hidden rounded-3xl bg-white pt-1 shadow-sm ring-1 ring-slate-100"
               >
-                <span className="text-sm font-black text-[#F58220]">
-                  {item.step}
-                </span>
+                <div className={`h-1.5 w-full ${item.accent}`} />
 
-                <h3 className="mt-4 text-2xl font-black text-[#252B68]">
-                  {item.title}
-                </h3>
+                <div className="p-7">
+                  <span className="text-sm font-black text-[#F58220]">
+                    {item.step}
+                  </span>
 
-                <p className="mt-4 leading-7 text-slate-600">
-                  {item.description}
-                </p>
+                  <h3 className="mt-4 text-2xl font-black text-[#252B68]">
+                    {item.title}
+                  </h3>
 
-                <div className="mt-6 h-1 w-12 rounded-full bg-[#FFE900]" />
+                  <p className="mt-4 leading-7 text-slate-600">
+                    {item.description}
+                  </p>
+
+                  <div className="mt-6 h-1 w-12 rounded-full bg-[#FFE900]" />
+                </div>
 
                 {index < journey.length - 1 && (
                   <div className="absolute -right-3 top-1/2 z-10 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-[#F58220] text-xs font-black text-white lg:flex">
@@ -862,8 +942,8 @@ export default async function Home() {
       {/* =========================================================
           SCHOOL LIFE
       ========================================================== */}
-      <section className="bg-white py-20 sm:py-24">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+        <div className="mx-auto max-w-[1250px]">
           <div className="grid overflow-hidden rounded-[2rem] bg-[#FFE900] lg:grid-cols-2">
             <div className="relative min-h-[320px]">
               <ImageWithFallback
@@ -874,11 +954,11 @@ export default async function Home() {
             </div>
 
             <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-14">
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[#252B68]">
+              <p className="text-xs font-black uppercase tracking-[3px] text-[#252B68]">
                 Extra Curricular Activities
               </p>
 
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+              <h2 className="mt-4 text-3xl font-black leading-tight tracking-tight text-[#252B68] sm:text-4xl">
                 Because learning happens everywhere.
               </h2>
 
@@ -896,7 +976,7 @@ export default async function Home() {
                   "Music",
                   "Drama & Dance",
                   "Life Skills Clubs",
-                  "Field Trips",
+                  "Fun & Educational Trips",
                   "House Competitions",
                 ].map((item) => (
                   <span
@@ -923,15 +1003,15 @@ export default async function Home() {
           GALLERY PREVIEW
       ========================================================== */}
       {galleryPreviewImages.length > 0 && (
-        <section className="bg-slate-50 py-20 sm:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <section className="bg-slate-50 px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+          <div className="mx-auto max-w-[1250px]">
+            <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+                <p className="mb-3 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
                   Gallery
                 </p>
 
-                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+                <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
                   {featuredGallery?.title || "Moments from around the school."}
                 </h2>
 
@@ -950,7 +1030,7 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="mt-12 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               <Link
                 href={
                   featuredGallery
@@ -999,15 +1079,15 @@ export default async function Home() {
           NEWS / COMMUNITY
       ========================================================== */}
       {hasNews && (
-        <section className="bg-white py-20 sm:py-24">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
+          <div className="mx-auto max-w-[1250px]">
+            <div className="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-[#F58220]">
+                <p className="mb-3 text-xs font-black uppercase tracking-[3px] text-[#F58220]">
                   Life at Mount View
                 </p>
 
-                <h2 className="mt-4 text-3xl font-black tracking-tight text-[#252B68] sm:text-4xl">
+                <h2 className="text-4xl font-black leading-tight text-[#252B68] sm:text-5xl">
                   See what is happening in our community.
                 </h2>
               </div>
@@ -1020,7 +1100,7 @@ export default async function Home() {
               </Link>
             </div>
 
-            <div className="mt-12 grid gap-6 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-3">
               {featuredStory && (
                 <Link
                   href={`/news?story=${featuredStory.slug}`}
@@ -1119,50 +1199,77 @@ export default async function Home() {
                 </Link>
               )}
             </div>
-
-            {!featuredEvent && (featuredStory || featuredGallery) && (
-              <p className="mt-6 text-center text-xs text-slate-400">
-                No upcoming events were returned from the API. If you have
-                events in the admin, check that
-                <code className="mx-1 rounded bg-slate-100 px-1">
-                  /api/events
-                </code>
-                is returning data — see the server console for details.
-              </p>
-            )}
           </div>
         </section>
       )}
 
       {/* =========================================================
-          ADMISSIONS CTA
+          QUICK NAVIGATION
       ========================================================== */}
-      <section className="relative overflow-hidden bg-[#252B68] py-20 sm:py-24">
+      <section className="bg-slate-50 px-6 py-16 sm:px-10 lg:px-16">
+        <div className="mx-auto max-w-[1250px]">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {QUICK_NAV_CARDS.map((card) => (
+              <Link
+                key={card.href}
+                href={card.href}
+                className={`group rounded-2xl p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl ${card.cardClass}`}
+              >
+                <p className={`text-sm font-black ${card.indexClass}`}>
+                  {card.index}
+                </p>
+
+                <h3 className={`mt-2 text-xl font-black ${card.titleClass}`}>
+                  {card.title}
+                </h3>
+
+                <p className={`mt-2 text-sm leading-6 ${card.descClass}`}>
+                  {card.desc}
+                </p>
+
+                <span
+                  className={`mt-4 inline-flex items-center gap-1 text-xs font-black uppercase tracking-wider ${card.accentClass}`}
+                >
+                  Explore
+                  <span className="transition group-hover:translate-x-1">→</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* =========================================================
+          MERGED FINAL CTA
+      ========================================================== */}
+      <section className="relative overflow-hidden bg-[#252B68] px-6 py-24 sm:px-10 lg:px-16">
         <div className="pointer-events-none absolute -right-40 -top-40 h-96 w-96 rounded-full bg-[#F58220]/10" />
         <div className="pointer-events-none absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-[#FFE900]/10" />
 
-        <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="relative mx-auto max-w-[1250px]">
           <div className="grid items-center gap-12 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-[#FFE900]">
-                Application for Admission
+              <p className="mb-4 text-xs font-black uppercase tracking-[3px] text-[#FFE900]">
+                Join the Mount View Family
               </p>
 
-              <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-                Ready to apply for a place at Mount View?
+              <h2 className="text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl">
+                Give your child a{" "}
+                <span className="text-[#FFE900]">bright beginning.</span>
               </h2>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100">
+                Take the first step towards an inspiring educational journey.
                 Start your child&apos;s application for admission to Mount View
-                International Primary School & Early Years Centre. Our
-                admissions team will guide you through the process from first
-                enquiry to your child&apos;s first day.
+                International Primary School &amp; Early Years Centre — our
+                admissions team will guide you from first enquiry to your
+                child&apos;s first day.
               </p>
 
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="/admissions"
-                  className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white transition hover:bg-[#d96e12] hover:shadow-lg"
+                  className="inline-flex items-center justify-center rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-xl"
                 >
                   Apply for Admission
                   <span className="ml-2">→</span>
@@ -1172,7 +1279,7 @@ export default async function Home() {
                   href="/contact"
                   className="inline-flex items-center justify-center rounded-full border-2 border-white/30 px-8 py-4 font-bold text-white transition hover:bg-white hover:text-[#252B68]"
                 >
-                  Make an Enquiry
+                  Contact Mount View
                 </Link>
               </div>
             </div>
@@ -1182,148 +1289,27 @@ export default async function Home() {
                 ♡
               </div>
 
-              <h3 className="mt-6 text-2xl font-black text-white">
-                Fostering growth, excellence, and empathy.
+              <h3 className="mt-6 text-2xl font-black leading-tight text-white">
+                Guided by our core values.
               </h3>
 
               <p className="mt-4 leading-8 text-blue-100">
-                These values are at the heart of the Mount View experience and
-                guide our approach to supporting learners as they develop their
-                knowledge, confidence, and independence.
+                These values sit at the heart of the Mount View experience and
+                guide how we support learners as they grow in knowledge,
+                confidence and independence.
               </p>
 
-              <div className="mt-7 grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-white/10 p-3 text-center">
-                  <p className="text-sm font-black text-[#FFE900]">Growth</p>
-                </div>
-
-                <div className="rounded-xl bg-white/10 p-3 text-center">
-                  <p className="text-sm font-black text-[#FFE900]">
-                    Excellence
-                  </p>
-                </div>
-
-                <div className="rounded-xl bg-white/10 p-3 text-center">
-                  <p className="text-sm font-black text-[#FFE900]">Empathy</p>
-                </div>
+              <div className="mt-7 flex flex-wrap gap-2">
+                {BRAND_VALUES.map((value) => (
+                  <span
+                    key={value}
+                    className="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-black text-[#FFE900]"
+                  >
+                    {value}
+                  </span>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          QUICK NAVIGATION
-      ========================================================== */}
-      <section className="bg-white py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Link
-              href="/about"
-              className="group rounded-2xl border border-slate-100 bg-slate-50 p-6 transition hover:-translate-y-1 hover:bg-[#252B68] hover:shadow-lg"
-            >
-              <p className="text-sm font-black text-[#F58220] group-hover:text-[#FFE900]">
-                01
-              </p>
-
-              <h3 className="mt-2 text-xl font-black text-[#252B68] group-hover:text-white">
-                About Us
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600 group-hover:text-blue-100">
-                Discover our school and values.
-              </p>
-            </Link>
-
-            <Link
-              href="/academics"
-              className="group rounded-2xl border border-slate-100 bg-slate-50 p-6 transition hover:-translate-y-1 hover:bg-[#252B68] hover:shadow-lg"
-            >
-              <p className="text-sm font-black text-[#F58220] group-hover:text-[#FFE900]">
-                02
-              </p>
-
-              <h3 className="mt-2 text-xl font-black text-[#252B68] group-hover:text-white">
-                Academics
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600 group-hover:text-blue-100">
-                Explore learning at Mount View.
-              </p>
-            </Link>
-
-            <Link
-              href="/school-life"
-              className="group rounded-2xl border border-slate-100 bg-slate-50 p-6 transition hover:-translate-y-1 hover:bg-[#252B68] hover:shadow-lg"
-            >
-              <p className="text-sm font-black text-[#F58220] group-hover:text-[#FFE900]">
-                03
-              </p>
-
-              <h3 className="mt-2 text-xl font-black text-[#252B68] group-hover:text-white">
-                School Life
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600 group-hover:text-blue-100">
-                See how learners experience school.
-              </p>
-            </Link>
-
-            <Link
-              href="/gallery"
-              className="group rounded-2xl border border-slate-100 bg-slate-50 p-6 transition hover:-translate-y-1 hover:bg-[#252B68] hover:shadow-lg"
-            >
-              <p className="text-sm font-black text-[#F58220] group-hover:text-[#FFE900]">
-                04
-              </p>
-
-              <h3 className="mt-2 text-xl font-black text-[#252B68] group-hover:text-white">
-                Gallery
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-600 group-hover:text-blue-100">
-                See moments from Mount View.
-              </p>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* =========================================================
-          FINAL CTA
-      ========================================================== */}
-      <section className="relative overflow-hidden bg-[#F58220]">
-        <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-white/10" />
-        <div className="pointer-events-none absolute -bottom-32 -right-24 h-80 w-80 rounded-full bg-[#252B68]/10" />
-
-        <div className="relative mx-auto max-w-7xl px-4 py-16 text-center sm:px-6 sm:py-20 lg:px-8">
-          <p className="text-sm font-black uppercase tracking-[0.22em] text-white/80">
-            Mount View International Primary School & Early Years Centre
-          </p>
-
-          <h2 className="mx-auto mt-4 max-w-4xl text-3xl font-black tracking-tight text-white sm:text-4xl lg:text-5xl">
-            Give your child a place to discover, develop, create, and thrive.
-          </h2>
-
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-white/90">
-            Apply for admission to Mount View and take the next step in your
-            child&apos;s learning journey with us.
-          </p>
-
-          <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href="/admissions"
-              className="rounded-full bg-[#252B68] px-8 py-4 font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#171B4A]"
-            >
-              Apply for Admission →
-            </Link>
-
-            <Link
-              href="/contact"
-              className="rounded-full bg-white px-8 py-4 font-black text-[#252B68] transition hover:-translate-y-1 hover:bg-[#FFE900]"
-            >
-              Contact Mount View
-            </Link>
           </div>
         </div>
       </section>
@@ -1333,12 +1319,13 @@ export default async function Home() {
       ========================================================== */}
       <section className="bg-[#171B4A] px-4 py-10 text-center">
         <p className="text-lg font-black text-[#FFE900] sm:text-xl">
-          Fostering growth, excellence and empathy.
+          Integrity · Inclusion · Responsibility · Respect · Collaboration ·
+          Well-being · Confidence
         </p>
 
         <p className="mt-2 text-sm text-blue-200">
-          Established in 1975 • Mount View International Primary School & Early
-          Years Centre
+          Established in 1975 • Mount View International Primary School &amp;
+          Early Years Centre
         </p>
       </section>
     </main>

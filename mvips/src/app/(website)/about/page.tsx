@@ -2,38 +2,12 @@ import Link from "next/link";
 import ImageWithFallback from "../../components/ImageWithFallback";
 
 /**
- * Revalidate every hour so years-of-service stay fresh.
+ * Revalidate every hour.
  */
 export const revalidate = 3600;
 
 /* =========================================================
-   HELPERS — dynamic years of service
-========================================================= */
-
-function getYearsOfService(sinceDate: string): number {
-  const start = new Date(sinceDate);
-  const now = new Date();
-
-  let years = now.getFullYear() - start.getFullYear();
-  const monthDiff = now.getMonth() - start.getMonth();
-  const dayDiff = now.getDate() - start.getDate();
-
-  if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
-    years--;
-  }
-
-  return Math.max(0, years);
-}
-
-function formatSinceDate(sinceDate: string): string {
-  return new Date(sinceDate).toLocaleDateString("en-GB", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-/* =========================================================
-   IN-PAGE NAVIGATION (Matches Header Dropdown)
+   IN-PAGE NAVIGATION (matches Header Dropdown)
 ========================================================= */
 
 const aboutNav = [
@@ -43,7 +17,7 @@ const aboutNav = [
   { label: "Governance & Board", href: "#board" },
   { label: "School Leadership", href: "#principal" },
   { label: "Academic Team", href: "#lead-teachers" },
-  { label: "Celebrating Our People", href: "#celebrating" },
+  { label: "Our Team", href: "#our-team" },
 ];
 
 /* =========================================================
@@ -174,6 +148,10 @@ const administrator = {
   ],
 };
 
+/* ---------------------------------------------------------
+   ACADEMIC TEAM DATA (unchanged)
+--------------------------------------------------------- */
+
 const curriculumLeads = [
   {
     name: "Ms. Samantha Crozier",
@@ -237,7 +215,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "English",
     photo: "/images/team/songolo.jpeg",
-    bio: "Ms Songolo brings 23 years of teaching experience at Mount View International School. She is passionate about working with young learners and creating a nurturing, engaging, and supportive learning environment. She believes in building strong foundations in literacy, numeracy, and essential life skills. She values teamwork and collaboration with colleagues and parents to support every child’s development, inspire confidence, and create meaningful learning experiences that help each child reach their full potential.",
+    bio: "Ms Songolo brings 23 years of teaching experience at Mount View International School. She is passionate about working with young learners and creating a nurturing, engaging, and supportive learning environment. She believes in building strong foundations in literacy, numeracy, and essential life skills.",
   },
   {
     name: "Ms. Muneerah Bhana",
@@ -264,7 +242,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "English",
     photo: "/images/team/wakisa.JPG",
-    bio: "Ms. Wakisa is a dedicated education professional with nine years of teaching experience and a passion for helping every learner succeed. As a Lead Teacher at Mount View International School, she supports curriculum delivery, mentor colleagues, and promotes effective teaching practices. She believes every child is unique and thrives through differentiated, hands-on learning. Ms. Wakisa values strong partnerships with parents and teamwork with colleagues to create an inclusive, engaging, and supportive environment where all learners can grow in confidence, develop their strengths, and achieve success.",
+    bio: "Ms. Wakisa is a dedicated education professional with nine years of teaching experience and a passion for helping every learner succeed. She believes every child is unique and thrives through differentiated, hands-on learning.",
   },
   {
     name: "Ms. Vanessa Adam",
@@ -273,7 +251,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "Mathematics",
     photo: "/images/team/vanesa.JPG",
-    bio: "With 20 years of experience at Mount View, Miss Adam is a dedicated educator passionate about nurturing young minds and inspiring a love for learning. As the Year 5 Lead Teacher, she is committed to supporting academic excellence, building pupils’ confidence and creating a positive learning environment. She values teamwork, continuous growth and helping every child to be the best version of themselves, both academically and personally.",
+    bio: "With 20 years of experience at Mount View, Miss Adam is a dedicated educator passionate about nurturing young minds and inspiring a love for learning. As the Year 5 Lead Teacher, she is committed to supporting academic excellence.",
   },
   {
     name: "Ms. Samantha Crozier",
@@ -286,30 +264,100 @@ const primaryTeachers = [
   },
 ];
 
-const longService = [
+/* ---------------------------------------------------------
+   OUR TEAM — group photo + short description (no member list)
+--------------------------------------------------------- */
+
+type Team = {
+  key: string;
+  name: string;
+  tagline: string;
+  description: string;
+  photo: string;
+  accent: "navy" | "orange" | "yellow";
+};
+
+const teams: Team[] = [
   {
-    name: "Ms Kalen Songolo",
-    initials: "S",
-    role: "Lead Teacher · Year 1",
-    sinceDate: "2003-06-15",
-    photo: "/images/team/songolo.jpeg",
-    note: "Ms Songolo brings 23 years of teaching experience at Mount View International School. She is passionate about working with young learners and creating a nurturing, engaging, and supportive learning environment. She believes in building strong foundations in literacy, numeracy, and essential life skills. She values teamwork and collaboration with colleagues and parents to support every child’s development, inspire confidence, and create meaningful learning experiences that help each child reach their full potential.",
+    key: "early-years",
+    name: "Early Years Team",
+    tagline: "Where joyful learning begins.",
+    description:
+      "A warm, play-rich team guiding our youngest learners from their very first steps through to confident, curious Reception children ready for Year 1.",
+    photo: "/images/teams/early-years-team.jpg",
+    accent: "yellow",
   },
   {
-    name: "Ms Vanesa Adam",
-    initials: "VA",
-    role: "Lead Teacher · Year 5",
-    sinceDate: "2006-06-15",
-    photo: "/images/team/vanesa.jpeg",
-    note: "With 20 years of experience at Mount View, Miss Adam is a dedicated educator passionate about nurturing young minds and inspiring a love for learning. As the Year 5 Lead Teacher, she is committed to supporting academic excellence, building pupils’ confidence and creating a positive learning environment. She values teamwork, continuous growth and helping every child to be the best version of themselves, both academically and personally.",
+    key: "Key Stage 1",
+    name: "Key Stage 1 Team",
+    tagline: "Strong foundations, confident starters.",
+    description:
+      "Dedicated teachers building early literacy, numeracy and independence — helping children settle into primary school life with courage and curiosity.",
+    photo: "/images/teams/year-1-team.jpg",
+    accent: "navy",
   },
   {
-    name: "Ms. Wakisa Mwanyongo",
-    initials: "WM",
-    role: "Lead Teacher · Year 4",
-    sinceDate: "2017-06-15",
-    photo: "/images/team/wakisa.JPG",
-    note: "Ms. Wakisa is a dedicated education professional with nine years of teaching experience and a passion for helping every learner succeed. As a Lead Teacher at Mount View International School, she supports curriculum delivery, mentor colleagues, and promotes effective teaching practices. She believes every child is unique and thrives through differentiated, hands-on learning. Ms. Wakisa values strong partnerships with parents and teamwork with colleagues to create an inclusive, engaging, and supportive environment where all learners can grow in confidence, develop their strengths, and achieve success.",
+    key: "Lower Key Stage 2",
+    name: "Lower Key Stage 2 Team",
+    tagline: "Curiosity, courage and character.",
+    description:
+      "A close-knit team growing young readers, writers and thinkers — celebrating every small victory as pupils gain confidence and take on bigger challenges.",
+    photo: "/images/teams/year-2-team.jpg",
+    accent: "orange",
+  },
+  { 
+    key: "Upper Key Stage 2",
+    name: "Upper Key Stage 2 Team",
+    tagline: "Growing independence, deepening skills.",
+    description:
+      "Guiding pupils through the transition into Key Stage 2 — widening their horizons while building study habits that last a lifetime.",
+    photo: "/images/teams/year-3-team.jpg",
+    accent: "navy",
+  },
+  // {
+  //   key: "year-4",
+  //   name: "Year 4 Team",
+  //   tagline: "Wider horizons, bigger challenges.",
+  //   description:
+  //     "Encouraging learners to explore, question and take ownership of their learning through rich topics, collaborative projects and creative problem-solving.",
+  //   photo: "/images/teams/year-4-team.jpg",
+  //   accent: "orange",
+  // },
+  // {
+  //   key: "year-5",
+  //   name: "Year 5 Team",
+  //   tagline: "Excellence, empathy and exploration.",
+  //   description:
+  //     "Preparing pupils for their final primary years — building depth in core subjects alongside confidence, resilience and a strong sense of community.",
+  //   photo: "/images/teams/year-5-team.jpg",
+  //   accent: "navy",
+  // },
+  // {
+  //   key: "year-6",
+  //   name: "Year 6 Team",
+  //   tagline: "Ready for the next chapter.",
+  //   description:
+  //     "Our final-year team prepares pupils for Cambridge Checkpoint exams and a confident move to secondary school — academically and personally.",
+  //   photo: "/images/teams/year-6-team.jpg",
+  //   accent: "orange",
+  // },
+  {
+    key: "specialist",
+    name: "Specialist Team",
+    tagline: "Creative, active, hands-on learning.",
+    description:
+      "Cambridge specialist teachers of Art, Dance & Drama, Music, PE, ICT and Swimming — bringing creativity, movement and discovery to every learner across the school.",
+    photo: "/images/teams/specialist-team.jpg",
+    accent: "yellow",
+  },
+  {
+    key: "admin",
+    name: "Admin Team",
+    tagline: "The friendly face behind every day.",
+    description:
+      "The team that keeps Mount View running smoothly — welcoming families, coordinating admissions, and supporting staff across every corner of the school.",
+    photo: "/images/teams/admin-team.jpg",
+    accent: "navy",
   },
 ];
 
@@ -776,7 +824,7 @@ export default function AboutPage() {
       </section>
 
       {/* =====================================================
-          SCHOOL LEADERSHIP
+          SCHOOL LEADERSHIP — ADMINISTRATOR FIRST, HEADTEACHER SECOND
       ====================================================== */}
       <section
         id="principal"
@@ -792,8 +840,53 @@ export default function AboutPage() {
             description="The people who set the tone, hold the vision and welcome every family through our doors."
           />
 
-          {/* Headteacher */}
-          <div className="mt-14 mb-20 grid items-start gap-12 lg:grid-cols-[440px_1fr] lg:gap-14">
+          {/* ADMINISTRATOR FIRST */}
+          <div className="mt-14 grid items-center gap-12 lg:grid-cols-[320px_1fr] lg:gap-14">
+            <div className="relative isolate overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#F58220] to-[#d96e12] p-8 text-center text-white shadow-xl">
+              <div className="pointer-events-none absolute -bottom-10 -right-10 z-0 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+              <span className="mv-float pointer-events-none absolute left-6 top-6 text-4xl opacity-40">🤝</span>
+              <div className="relative z-10">
+                <div className="mx-auto">
+                  <PersonAvatar
+                    photo={administrator.photo}
+                    name={administrator.name}
+                    initials={administrator.initials}
+                    size="h-40 w-40"
+                    ring="ring-white/40"
+                  />
+                </div>
+                <h3 className="mt-6 text-xl font-black">
+                  {administrator.name}
+                </h3>
+                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-white/90">
+                  {administrator.role}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <Eyebrow>School Administrator</Eyebrow>
+              <h2 className="mt-4 text-2xl font-black text-[#252B68] sm:text-3xl">
+                The first warm welcome most families receive.
+              </h2>
+              <p className="mt-4 leading-8 text-slate-600">
+                {administrator.bio}
+              </p>
+              <div className="mt-6 space-y-3">
+                {administrator.highlights.map((item) => (
+                  <div key={item} className="flex items-start gap-3">
+                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFE900] text-sm font-black text-[#252B68]">
+                      ✓
+                    </span>
+                    <p className="font-medium text-slate-700">{item}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* HEADTEACHER SECOND */}
+          <div className="mt-20 grid items-start gap-12 border-t border-slate-100 pt-16 lg:grid-cols-[440px_1fr] lg:gap-14">
             <div className="relative isolate overflow-hidden rounded-[2rem] bg-[#252B68] p-8 text-center text-white shadow-xl sm:p-10">
               <div className="pointer-events-none absolute -left-12 -top-12 z-0 h-40 w-40 rounded-full bg-[#F58220]/30 blur-2xl" />
               <span className="mv-float-alt pointer-events-none absolute right-6 top-6 text-4xl opacity-30">👋</span>
@@ -848,56 +941,11 @@ export default function AboutPage() {
               </p>
             </div>
           </div>
-
-          {/* Administrator */}
-          <div className="grid items-center gap-12 border-t border-slate-100 pt-16 lg:grid-cols-[320px_1fr] lg:gap-14">
-            <div className="relative isolate overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#F58220] to-[#d96e12] p-8 text-center text-white shadow-xl">
-              <div className="pointer-events-none absolute -bottom-10 -right-10 z-0 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
-              <span className="mv-float pointer-events-none absolute left-6 top-6 text-4xl opacity-40">🤝</span>
-              <div className="relative z-10">
-                <div className="mx-auto">
-                  <PersonAvatar
-                    photo={administrator.photo}
-                    name={administrator.name}
-                    initials={administrator.initials}
-                    size="h-40 w-40"
-                    ring="ring-white/40"
-                  />
-                </div>
-                <h3 className="mt-6 text-xl font-black">
-                  {administrator.name}
-                </h3>
-                <p className="mt-1 text-[11px] font-black uppercase tracking-[0.2em] text-white/90">
-                  {administrator.role}
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <Eyebrow>School Administrator</Eyebrow>
-              <h2 className="mt-4 text-2xl font-black text-[#252B68] sm:text-3xl">
-                The first warm welcome most families receive.
-              </h2>
-              <p className="mt-4 leading-8 text-slate-600">
-                {administrator.bio}
-              </p>
-              <div className="mt-6 space-y-3">
-                {administrator.highlights.map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <span className="mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FFE900] text-sm font-black text-[#252B68]">
-                      ✓
-                    </span>
-                    <p className="font-medium text-slate-700">{item}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
       {/* =====================================================
-          ACADEMIC TEAM
+          ACADEMIC TEAM (unchanged)
       ====================================================== */}
       <section
         id="lead-teachers"
@@ -994,10 +1042,10 @@ export default function AboutPage() {
       </section>
 
       {/* =====================================================
-          CELEBRATING OUR PEOPLE
+          OUR TEAM — group photo, tagline, description
       ====================================================== */}
       <section
-        id="celebrating"
+        id="our-team"
         className="relative scroll-mt-40 overflow-hidden bg-[#252B68] px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28"
       >
         <div className="pointer-events-none absolute inset-0">
@@ -1005,70 +1053,27 @@ export default function AboutPage() {
           <div className="mv-blob absolute -bottom-40 right-0 z-0 h-96 w-96 rounded-full bg-[#F58220]/25 blur-3xl [animation-delay:-7s]" />
         </div>
 
-        <span className="mv-float pointer-events-none absolute left-[6%] top-12 text-5xl opacity-25">🎉</span>
-        <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-12 text-5xl opacity-25">🏆</span>
+        <span className="mv-float pointer-events-none absolute left-[6%] top-12 text-5xl opacity-25">👥</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-12 text-5xl opacity-25">🌟</span>
 
         <div className="relative mx-auto max-w-7xl">
           <CenteredHeading
-            eyebrow="Celebrating Our People"
-            title="Ten years or more, giving their best to Mount View."
-            description="Long-serving educators whose dedication shapes the character of our school."
+            eyebrow="Our Team"
+            title="Every team, working with your child."
+            description="From Early Years through to Year 6 — and everyone who keeps the school running — here are the teams that make Mount View feel like home."
             tone="dark"
           />
 
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
-            {longService.map((person) => {
-              const years = getYearsOfService(person.sinceDate);
-
-              return (
-                <div
-                  key={person.name}
-                  className="group flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-[#FFE900]/40 hover:bg-white/10"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <PersonAvatar
-                      photo={person.photo}
-                      name={person.name}
-                      initials={person.initials}
-                      size="h-28 w-28"
-                      ring="ring-[#FFE900]/50"
-                    />
-
-                    <div className="text-right">
-                      <p className="text-3xl font-black leading-none text-[#FFE900]">
-                        {years}
-                      </p>
-                      <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-blue-100">
-                        {years === 1 ? "Year" : "Years"}
-                      </p>
-                    </div>
-                  </div>
-
-                  <h4 className="mt-5 text-lg font-black text-white">
-                    {person.name}
-                  </h4>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-[#FFE900]/80">
-                    {person.role}
-                  </p>
-
-                  <p className="mt-3 flex-1 text-sm leading-7 text-blue-100">
-                    {person.note}
-                  </p>
-
-                  <div className="mt-4">
-                    <span className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white">
-                      At Mount View since {formatSinceDate(person.sinceDate)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {teams.map((team) => (
+              <TeamCard key={team.key} team={team} />
+            ))}
           </div>
         </div>
       </section>
 
       {/* =====================================================
-          FINAL CTA  — Alumni focus
+          FINAL CTA — Alumni focus
       ====================================================== */}
       <section className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
         <div className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] bg-[#252B68] p-10 text-center shadow-2xl sm:p-14 lg:p-16">
@@ -1308,5 +1313,71 @@ function TeacherCard({
         <p className="mt-3 text-sm leading-7 text-slate-600">{teacher.bio}</p>
       </div>
     </div>
+  );
+}
+
+/* =========================================================
+   TEAM CARD — group photo + tagline + description
+========================================================= */
+
+function TeamCard({ team }: { team: Team }) {
+  const accentBadge =
+    team.accent === "yellow"
+      ? "bg-[#FFE900] text-[#252B68]"
+      : team.accent === "orange"
+      ? "bg-[#F58220] text-white"
+      : "bg-[#252B68] text-white";
+
+  const accentBar =
+    team.accent === "yellow"
+      ? "bg-[#FFE900]"
+      : team.accent === "orange"
+      ? "bg-[#F58220]"
+      : "bg-[#252B68]";
+
+  return (
+    <article className="group flex h-full flex-col overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-white/10 transition duration-300 hover:-translate-y-1.5 hover:shadow-2xl">
+      {/* Group photo */}
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+        <ImageWithFallback
+          src={team.photo}
+          alt={`${team.name} group photo`}
+          className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+        />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+
+        {/* Team name overlay */}
+        <div className="absolute inset-x-0 bottom-0 p-5">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FFE900]">
+            Team
+          </p>
+          <p className="mt-1 text-xl font-black leading-tight text-white sm:text-2xl">
+            {team.name}
+          </p>
+        </div>
+
+        {/* Accent badge */}
+        <div className="absolute right-4 top-4">
+          <span
+            className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest shadow-md ${accentBadge}`}
+          >
+            Our Team
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex flex-1 flex-col p-6">
+        <div className={`h-1 w-12 rounded-full ${accentBar}`} />
+
+        <p className="mt-4 text-sm font-bold leading-6 text-[#252B68]">
+          {team.tagline}
+        </p>
+
+        <p className="mt-3 flex-1 text-sm leading-7 text-slate-600">
+          {team.description}
+        </p>
+      </div>
+    </article>
   );
 }

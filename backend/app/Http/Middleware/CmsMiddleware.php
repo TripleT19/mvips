@@ -9,18 +9,19 @@ use Symfony\Component\HttpFoundation\Response;
 class CmsMiddleware
 {
     /**
-     * Roles allowed to manage website content (stories, events, gallery,
-     * newsletters, contact messages, categories).
+     * Roles allowed to manage website content
+     * (stories, events, gallery, newsletters, contact messages,
+     *  policies, categories, leadership activities, houses,
+     *  top achievers).
      *
-     * Tune this list to match the `role` column on your users table.
+     * As of this release, CMS is ADMIN ONLY — matching the admin
+     * sidebar which now hides CMS links from all other roles.
      */
     protected array $allowedRoles = [
+        'admin',
         'administrator',
-        'principal',
-        'headteacher',
-        'content_manager',
-        'communications_officer',
-        'editor',
+        'super_admin',
+        'superadmin',
     ];
 
     public function handle(Request $request, Closure $next): Response

@@ -49,6 +49,12 @@ use App\Http\Controllers\Api\FeeInvoiceController;
 use App\Http\Controllers\Api\FeePaymentController;
 use App\Http\Controllers\Api\FeeDashboardController;
 
+/* ---- School Life / CMS content ---- */
+use App\Http\Controllers\Api\LeadershipActivityController;
+use App\Http\Controllers\Api\HouseController;
+use App\Http\Controllers\Api\TopAchieverController;
+use App\Http\Controllers\Api\PolicyController;
+
 /* ============================================================
  * ADMIN AUTH
  * ============================================================ */
@@ -88,6 +94,19 @@ Route::post('/newsletter-subscribers', [NewsletterSubscriberController::class, '
 Route::get('/newsletter-subscribers/unsubscribe/{token}', [NewsletterSubscriberController::class, 'unsubscribe']);
 
 Route::post('/contact-messages', [ContactMessageController::class, 'store']);
+
+/* ---- Leadership activities (public) ---- */
+Route::get('/leadership-activities', [LeadershipActivityController::class, 'publicIndex']);
+Route::get('/leadership-activities/{slug}', [LeadershipActivityController::class, 'publicShow']);
+
+/* ---- Policies (public) ---- */
+Route::get('/policies',                  [PolicyController::class, 'publicIndex']);
+Route::get('/policies/{policy}',         [PolicyController::class, 'publicShow']);
+Route::get('/policies/{policy}/download',[PolicyController::class, 'publicDownload']);
+
+/* ---- Houses & Top Achievers (public) ---- */
+Route::get('/houses', [HouseController::class, 'publicIndex']);
+Route::get('/top-achievers', [TopAchieverController::class, 'publicIndex']);
 
 /* ============================================================
  * PUBLIC ADMISSIONS
@@ -178,25 +197,32 @@ Route::middleware(['auth:sanctum', 'admin', 'alumni-approver'])
 
 /* ============================================================
  * CMS — website content
+ * ------------------------------------------------------------
+ * Protects: categories, stories, events, gallery, newsletters,
+ * contact messages, leadership activities, houses, top achievers
  * ============================================================ */
 
 Route::middleware(['auth:sanctum', 'admin', 'cms'])->group(function () {
 
+    /* ---- Categories ---- */
     Route::get('/admin/categories', [CategoryController::class, 'index']);
     Route::post('/admin/categories', [CategoryController::class, 'store']);
 
+    /* ---- Stories ---- */
     Route::get('/admin/stories', [StoryController::class, 'index']);
     Route::post('/admin/stories', [StoryController::class, 'store']);
     Route::get('/admin/stories/{story}', [StoryController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/admin/stories/{story}', [StoryController::class, 'update']);
     Route::delete('/admin/stories/{story}', [StoryController::class, 'destroy']);
 
+    /* ---- Events ---- */
     Route::get('/admin/events', [EventController::class, 'index']);
     Route::post('/admin/events', [EventController::class, 'store']);
     Route::get('/admin/events/{event}', [EventController::class, 'show']);
     Route::match(['post', 'put', 'patch'], '/admin/events/{event}', [EventController::class, 'update']);
     Route::delete('/admin/events/{event}', [EventController::class, 'destroy']);
 
+    /* ---- Gallery ---- */
     Route::get('/admin/gallery', [GalleryController::class, 'index']);
     Route::post('/admin/gallery', [GalleryController::class, 'store']);
     Route::get('/admin/gallery/{gallery}', [GalleryController::class, 'show']);
@@ -206,6 +232,7 @@ Route::middleware(['auth:sanctum', 'admin', 'cms'])->group(function () {
     Route::delete('/admin/gallery-images/{galleryImage}', [GalleryImageController::class, 'destroy']);
     Route::post('/admin/gallery-images/reorder', [GalleryImageController::class, 'reorder']);
 
+    /* ---- Newsletters ---- */
     Route::get('/admin/newsletters', [NewsletterController::class, 'index']);
     Route::post('/admin/newsletters', [NewsletterController::class, 'store']);
     Route::get('/admin/newsletters/{newsletter}', [NewsletterController::class, 'show']);
@@ -215,11 +242,56 @@ Route::middleware(['auth:sanctum', 'admin', 'cms'])->group(function () {
     Route::get('/admin/newsletter-subscribers', [NewsletterSubscriberController::class, 'index']);
     Route::delete('/admin/newsletter-subscribers/{subscriber}', [NewsletterSubscriberController::class, 'destroy']);
 
+    /* ---- Policies (admin) ---- */
+Route::get('/admin/policies',       [PolicyController::class, 'index']);
+Route::post('/admin/policies',      [PolicyController::class, 'store']);
+Route::match(
+    ['put', 'patch'],
+    '/admin/policies/{policy}',
+    [PolicyController::class, 'update']
+);
+Route::delete('/admin/policies/{policy}', [PolicyController::class, 'destroy']);
+
+    /* ---- Contact Messages ---- */
     Route::get('/admin/contact-messages', [ContactMessageController::class, 'index']);
     Route::get('/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'show']);
     Route::match(['put', 'patch'], '/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'update']);
     Route::post('/admin/contact-messages/{contactMessage}/reply', [ContactMessageController::class, 'reply']);
     Route::delete('/admin/contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
+
+    /* ============================================================
+     * LEADERSHIP ACTIVITIES (admin)
+     * ============================================================ */
+    Route::get('/admin/leadership-activities', [LeadershipActivityController::class, 'index']);
+    Route::post('/admin/leadership-activities', [LeadershipActivityController::class, 'store']);
+    Route::get('/admin/leadership-activities/{leadershipActivity}', [LeadershipActivityController::class, 'show']);
+    Route::match(['put', 'patch'], '/admin/leadership-activities/{leadershipActivity}', [LeadershipActivityController::class, 'update']);
+    Route::delete('/admin/leadership-activities/{leadershipActivity}', [LeadershipActivityController::class, 'destroy']);
+
+    /* ============================================================
+     * HOUSES (admin)
+     * ------------------------------------------------------------
+     * IMPORTANT: `/bulk-points` must be declared before any
+     * dynamic house route with the same HTTP verb.
+     * ============================================================ */
+    Route::post('/admin/houses/bulk-points', [HouseController::class, 'bulkPoints']);
+    Route::get('/admin/houses', [HouseController::class, 'index']);
+    Route::post('/admin/houses', [HouseController::class, 'store']);
+    Route::match(['put', 'patch'], '/admin/houses/{house}', [HouseController::class, 'update']);
+    Route::delete('/admin/houses/{house}', [HouseController::class, 'destroy']);
+
+    /* ============================================================
+     * TOP ACHIEVERS (admin)
+     * ------------------------------------------------------------
+     * `/batch` must be declared before any dynamic
+     * `/top-achievers/{topAchiever}` POST route so the batch
+     * path is not mistaken for an id.
+     * ============================================================ */
+    Route::post('/admin/top-achievers/batch', [TopAchieverController::class, 'storeBatch']);
+    Route::get('/admin/top-achievers', [TopAchieverController::class, 'index']);
+    Route::post('/admin/top-achievers', [TopAchieverController::class, 'store']);
+    Route::match(['put', 'patch'], '/admin/top-achievers/{topAchiever}', [TopAchieverController::class, 'update']);
+    Route::delete('/admin/top-achievers/{topAchiever}', [TopAchieverController::class, 'destroy']);
 });
 
 /* ============================================================

@@ -58,9 +58,9 @@ const navigation: NavItem[] = [
         description: "Curriculum leads, coordinators and class teachers",
       },
       {
-        name: "Celebrating Our People",
-        href: "/about#celebrating",
-        description: "10+ years of dedicated service",
+        name: "Our Team",
+        href: "/about#our-team",
+        description: "Every team, from Early Years to Admin",
       },
       {
         name: "Alumni",
@@ -71,7 +71,23 @@ const navigation: NavItem[] = [
   },
   { type: "link", name: "Academics", href: "/academics" },
   { type: "link", name: "Admissions", href: "/admissions" },
-  { type: "link", name: "School Life", href: "/school-life" },
+  {
+    type: "group",
+    name: "Student Life",
+    matchPrefixes: ["/school-life", "/top-achievers"],
+    items: [
+      {
+        name: "School Life",
+        href: "/school-life",
+        description: "Clubs, houses, sport and everyday experiences",
+      },
+      {
+        name: "Top Achievers",
+        href: "/top-achievers",
+        description: "Cambridge Checkpoint results and honours",
+      },
+    ],
+  },
   {
     type: "group",
     name: "News & Media",
@@ -89,6 +105,8 @@ const navigation: NavItem[] = [
       },
     ],
   },
+  /* ⬇️ NEW — top-level Policies link */
+  { type: "link", name: "Policies", href: "/policies" },
   { type: "link", name: "Gallery", href: "/gallery" },
 ];
 
@@ -218,7 +236,7 @@ export default function Header() {
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
-              Lilongwe, Malawi
+              Blantyre, Malawi
             </span>
 
             <span className="h-1 w-1 rounded-full bg-[#FFE900]" />
@@ -240,7 +258,7 @@ export default function Header() {
               >
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
               </svg>
-              +265 1 750 100
+              +265 997 355 319
             </a>
           </div>
         </div>

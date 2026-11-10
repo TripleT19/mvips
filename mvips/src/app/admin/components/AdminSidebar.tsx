@@ -3,6 +3,7 @@
 import {
   Award,
   BarChart3,
+  BookMarked,
   BookOpen,
   CalendarDays,
   Camera,
@@ -18,8 +19,10 @@ import {
   ListChecks,
   LogOut,
   Mail,
+  Medal,
   Settings,
   ShieldCheck,
+  Trophy,
   UserCircle,
   UserPlus,
   Users,
@@ -104,6 +107,7 @@ type Child = {
 
 /* ============================================================
  * STAFF NAV DEFINITION
+ *   → "Policies" has been added to the CMS group.
  * ============================================================ */
 
 const staffNavGroups: NavGroup[] = [
@@ -111,12 +115,16 @@ const staffNavGroups: NavGroup[] = [
     key: "cms",
     label: "Main Menu",
     items: [
-      { label: "Contact Messages", href: "/admin/contact-messages", icon: Mail,                 access: "cms" },
-      { label: "Newsletters",      href: "/admin/newsletters",      icon: FileText,             access: "cms" },
-      { label: "Stories & News",   href: "/admin/stories",          icon: BookOpen,             access: "cms" },
-      { label: "Events",           href: "/admin/events",           icon: CalendarDays,         access: "cms" },
-      { label: "Gallery",          href: "/admin/gallery",          icon: GalleryHorizontalEnd, access: "cms" },
-      { label: "Alumni",           href: "/admin/alumni",           icon: Award,                access: "alumni" },
+      { label: "Contact Messages",      href: "/admin/contact-messages",      icon: Mail,                 access: "cms" },
+      { label: "Newsletters",           href: "/admin/newsletters",           icon: FileText,             access: "cms" },
+      { label: "Stories & News",        href: "/admin/stories",               icon: BookOpen,             access: "cms" },
+      { label: "Events",                href: "/admin/events",                icon: CalendarDays,         access: "cms" },
+      { label: "Gallery",               href: "/admin/gallery",               icon: GalleryHorizontalEnd, access: "cms" },
+      { label: "Policies",              href: "/admin/policies",              icon: BookMarked,           access: "cms" },
+      { label: "Leadership Activities", href: "/admin/leadership-activities", icon: Award,                access: "cms" },
+      { label: "House Points",          href: "/admin/houses",                icon: Trophy,               access: "cms" },
+      { label: "Top Achievers",         href: "/admin/top-achievers",         icon: Medal,                access: "cms" },
+      { label: "Alumni",                href: "/admin/alumni",                icon: Award,                access: "alumni" },
     ],
   },
   {
@@ -170,30 +178,49 @@ const staffNavGroups: NavGroup[] = [
 
 /* ============================================================
  * ACCESS MAP
+ *   → "cms" is now granted to admin ONLY.
+ *     Headteachers / teachers no longer see CMS links.
  * ============================================================ */
 
 function buildAccessSet(role: string, caps: Caps | null): Set<NavAccess> {
   const r = normalise(role);
   const set = new Set<NavAccess>();
 
-  // ── Superusers ──
+  // ── Superusers — full CMS + admin surface ──
   if (["admin", "administrator", "super_admin", "superadmin"].includes(r)) {
-    (["cms", "alumni", "academics", "results", "users", "student_accounts", "settings"] as NavAccess[])
-      .forEach((a) => set.add(a));
+    ([
+      "cms",
+      "alumni",
+      "academics",
+      "results",
+      "users",
+      "student_accounts",
+      "settings",
+    ] as NavAccess[]).forEach((a) => set.add(a));
     return set;
   }
 
-  // ── Headteacher / Principal ──
+  // ── Headteacher / Principal — no CMS (admin only) ──
   if (["headteacher", "head_teacher", "principal"].includes(r)) {
-    (["cms", "alumni", "admissions", "assessment_sheet", "student_accounts", "settings"] as NavAccess[])
-      .forEach((a) => set.add(a));
+    ([
+      "alumni",
+      "admissions",
+      "assessment_sheet",
+      "student_accounts",
+      "settings",
+    ] as NavAccess[]).forEach((a) => set.add(a));
     return set;
   }
 
-  // ── Lead / Class teacher ──
+  // ── Lead / Class teacher — no CMS (admin only) ──
   if (["lead_teacher", "class_teacher"].includes(r)) {
-    (["cms", "attendance", "assessment_objectives", "assessment_sheet", "photos", "settings"] as NavAccess[])
-      .forEach((a) => set.add(a));
+    ([
+      "attendance",
+      "assessment_objectives",
+      "assessment_sheet",
+      "photos",
+      "settings",
+    ] as NavAccess[]).forEach((a) => set.add(a));
     return set;
   }
 
@@ -207,7 +234,8 @@ function buildAccessSet(role: string, caps: Caps | null): Set<NavAccess> {
   // ── Specialist teacher ──
   if (isSpecialistRole(r)) {
     if (caps?.has_core_subject_assignment) {
-      (["assessment_objectives", "assessment_sheet", "settings"] as NavAccess[]).forEach((a) => set.add(a));
+      (["assessment_objectives", "assessment_sheet", "settings"] as NavAccess[])
+        .forEach((a) => set.add(a));
     } else {
       (["assessment_sheet", "settings"] as NavAccess[]).forEach((a) => set.add(a));
     }

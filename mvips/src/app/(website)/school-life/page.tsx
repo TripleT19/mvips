@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ImageWithFallback from "../../components/ImageWithFallback";
+import SpeechVideoPlayer from "../../components/SpeechVideoPlayer";
 
 /* =========================================================
    API / BACKEND HELPERS
@@ -46,15 +47,23 @@ type GalleryItem = {
   images: GalleryImage[];
 };
 
-/* ---------------------------------------------------------
-   Robust array extractor — mirrors the shape-handling used
-   on Home, News, and Gallery so any of these Laravel
-   response shapes work:
-     { data: { data: [...] } }
-     { data: [...] }
-     { galleries: [...] } / { events: [...] } / { stories: [...] }
-     [...]
---------------------------------------------------------- */
+type House = {
+  id: number;
+  name: string;
+  code: string | null;
+  colour: string;
+  image_url: string | null;
+  featured_image_url: string | null;
+  sort_order: number;
+  points: number;
+  position: number;
+};
+
+type HousesResponse = {
+  data: House[];
+  academic_year_name: string | null;
+};
+
 function extractArray<T = unknown>(payload: unknown): T[] {
   if (!payload) return [];
   const p = payload as Record<string, unknown>;
@@ -90,7 +99,12 @@ async function fetchJson(path: string): Promise<unknown> {
       console.error(`[school-life] GET ${url} → ${res.status}`);
       return null;
     }
-    return await res.json();
+    const text = await res.text();
+    if (!text.trimStart().startsWith("{")) {
+      console.error(`[school-life] GET ${url} returned non-JSON`);
+      return null;
+    }
+    return JSON.parse(text);
   } catch (err) {
     console.error(`[school-life] GET ${url} failed:`, err);
     return null;
@@ -114,11 +128,53 @@ async function getLatestStories(limit = 6): Promise<Story[]> {
   return extractArray<Story>(json);
 }
 
+async function getHouses(): Promise<HousesResponse> {
+  const json = (await fetchJson(`/api/houses`)) as
+    | { data?: House[]; academic_year_name?: string | null }
+    | null;
+
+  if (!json || !Array.isArray(json.data)) {
+    return { data: [], academic_year_name: null };
+  }
+  return {
+    data: json.data,
+    academic_year_name: json.academic_year_name ?? null,
+  };
+}
+
 function resolveImageUrl(url: string | null | undefined): string {
   if (!url) return "";
   if (/^https?:\/\//i.test(url)) return url;
   const trimmed = url.startsWith("/") ? url : `/${url}`;
   return `${API_URL}${trimmed}`;
+}
+
+/* =========================================================
+   COLOUR HELPERS
+========================================================= */
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const clean = (hex || "").replace("#", "").trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(clean)) return null;
+  return {
+    r: parseInt(clean.substr(0, 2), 16),
+    g: parseInt(clean.substr(2, 2), 16),
+    b: parseInt(clean.substr(4, 2), 16),
+  };
+}
+
+function contrastText(hex: string, light = "#FFFFFF", dark = "#252B68"): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return light;
+  const lum = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+  return lum > 0.6 ? dark : light;
+}
+
+function ordinal(n: number): string {
+  if (n === 1) return "1st";
+  if (n === 2) return "2nd";
+  if (n === 3) return "3rd";
+  return `${n}th`;
 }
 
 /* =========================================================
@@ -207,8 +263,6 @@ function findImage(
 
 /* =========================================================
    STATIC BRAND CONTENT
-   (image extensions preserved case-sensitively — do not
-   change .JPG / .jpg / .jpeg / .png casing)
 ========================================================= */
 
 const experienceSlots = [
@@ -218,16 +272,7 @@ const experienceSlots = [
     text: "Physical activities that encourage teamwork, confidence, coordination and resilience. Students compete in the Fun Run, Sports Day, and Swimming Gala earning points for their Houses.",
     icon: "🏃",
     accent: "yellow" as const,
-    keywords: [
-      "sport",
-      "athletic",
-      "football",
-      "soccer",
-      "ball",
-      "run",
-      "gym",
-      "fitness",
-    ],
+    keywords: ["sport", "athletic", "football", "soccer", "ball", "run", "gym", "fitness"],
     fallbackImage: "/images/sports.JPG",
   },
   {
@@ -263,19 +308,7 @@ const experienceSlots = [
     text: "Art, Music, Drama, and Dance come together to give learners space to express their imagination, discover new talents, and build confidence.",
     icon: "🎭",
     accent: "orange" as const,
-    keywords: [
-      "art",
-      "paint",
-      "draw",
-      "craft",
-      "creativ",
-      "design",
-      "music",
-      "dance",
-      "drama",
-      "sing",
-      "perform",
-    ],
+    keywords: ["art", "paint", "draw", "craft", "creativ", "design", "music", "dance", "drama", "sing", "perform"],
     fallbackImage: "/images/creative-arts1.jpg",
   },
   {
@@ -284,50 +317,59 @@ const experienceSlots = [
     text: "From local farms and nurseries to The Reserve banks and Lacaverna. Year 6 enjoys a residential trip to Game Haven for team building and independence.",
     icon: "🚌",
     accent: "navy" as const,
-    keywords: [
-      "trip",
-      "excursion",
-      "visit",
-      "tour",
-      "outdoor",
-      "field",
-      "journey",
-      "adventure",
-    ],
+    keywords: ["trip", "excursion", "visit", "tour", "outdoor", "field", "journey", "adventure"],
     fallbackImage: "/images/trips.jpg",
   },
 ];
 
-const houses = [
+/* Fallback houses — used only if the API returns none yet. */
+const FALLBACK_HOUSES: House[] = [
   {
+    id: 1,
     name: "Sunbird House",
-    color: "bg-red-600 text-white",
-    image: "/images/houses/sunbird.jpeg",
-    alt: "SunBird House badge",
+    code: "SUN",
+    colour: "#DC2626",
+    image_url: "/images/houses/sunbird.jpeg",
+    featured_image_url: null,
+    sort_order: 1,
+    points: 0,
+    position: 1,
   },
   {
+    id: 2,
     name: "Baobab House",
-    color: "bg-green-600 text-white",
-    image: "/images/houses/baobab.jpeg",
-    alt: "Baobab House badge",
+    code: "BAO",
+    colour: "#16A34A",
+    image_url: "/images/houses/baobab.jpeg",
+    featured_image_url: null,
+    sort_order: 2,
+    points: 0,
+    position: 2,
   },
   {
+    id: 3,
     name: "Eagle House",
-    color: "bg-yellow-400 text-[#252B68]",
-    image: "/images/houses/eagle.jpeg",
-    alt: "Eagle House badge",
+    code: "EAG",
+    colour: "#FACC15",
+    image_url: "/images/houses/eagle.jpeg",
+    featured_image_url: null,
+    sort_order: 3,
+    points: 0,
+    position: 3,
   },
   {
+    id: 4,
     name: "Lake House",
-    color: "bg-blue-600 text-white",
-    image: "/images/houses/lake.jpeg",
-    alt: "Lake House badge",
+    code: "LAK",
+    colour: "#2563EB",
+    image_url: "/images/houses/lake.jpeg",
+    featured_image_url: null,
+    sort_order: 4,
+    points: 0,
+    position: 4,
   },
 ];
 
-/* ---------------------------------------------------------
-   Student leadership roles — updated
---------------------------------------------------------- */
 const leadershipRoles = [
   "Head Boy & Deputy Head Boy",
   "Head Girl & Deputy Head Girl",
@@ -337,34 +379,88 @@ const leadershipRoles = [
   "House Captains",
 ];
 
+/* =========================================================
+   HEAD BOY & HEAD GIRL SPEECHES
+   — YouTube video IDs (unlisted recommended) + full transcript.
+     Only one video can play at a time (see SpeechVideoPlayer).
+========================================================= */
+
+type SpeechVideo =
+  | { type: "youtube"; id: string }
+  | { type: "file"; src: string; poster?: string }
+  | null;
+
+type LeadershipSpeech = {
+  role: "Head Boy" | "Head Girl";
+  name: string;
+  grade: string;
+  initials: string;
+  image: string | null;
+  quote: string;
+  video: SpeechVideo;
+  transcript: string[];
+};
+
+const leadershipSpeeches: LeadershipSpeech[] = [
+  {
+    role: "Head Boy",
+    name: "Head Boy",
+    grade: "Year 6",
+    initials: "HB",
+    image: null, // e.g. "/images/head-boy.jpg"
+    quote:
+      "Being Head Boy has taught me that true leadership is about listening first, then acting with purpose.",
+    video: { type: "youtube", id: "HqAcysEb804" },
+    transcript: [
+      "When I first joined Mount View, I was shy and unsure of myself. Through the encouragement of my teachers, and the chance to lead in class and on the sports field, I slowly found my voice — and I want every learner to have that same chance.",
+      "This year, I want every student to feel that they belong — whether they are brand new to Mount View or have been here since Early Years. I want us to celebrate each other's wins, in the pool, on Sports Day, and in the classroom.",
+      "Thank you for trusting me to serve. Let's make this a year to remember.",
+    ],
+  },
+  {
+    role: "Head Girl",
+    name: "Head Girl",
+    grade: "Year 6",
+    initials: "HG",
+    image: null, // e.g. "/images/head-girl.jpg"
+    quote:
+      "Leadership is not a title — it is the small choices we make every day to lift others up.",
+    video: { type: "youtube", id: "JO_gLXmUmmM" },
+    transcript: [
+      "Mount View has given me countless opportunities to grow — from the swimming pool to the drama stage, from the library to the House competitions. Each one has shaped the leader I am today.",
+      "As Head Girl, I want every student to know that their voice matters. Whether you are in Year 1 or Year 6, your ideas, your kindness and your courage make our school stronger.",
+      "I am excited to work alongside the Head Boy, our deputies, and all the class captains to build a year full of friendship, learning, and joy.",
+    ],
+  },
+];
+
 const dailyLifeInfo = [
   {
     title: "School Clinic",
     icon: "🏥",
+    image: "/images/school-clinic.jpg",
     desc: "Our school nurse provides first aid. If a child is ill or injured, they are admitted to the clinic and parents are promptly informed by telephone.",
   },
   {
     title: "Healthy Eating",
     icon: "🍎",
+    image: "/images/healthy-eating.jpg",
     desc: "We promote healthy eating aligned with Article 24 of the UN Convention. Packed lunches must include fruit/veg and avoid sweets, fizzy drinks, and strictly no nuts.",
   },
   {
     title: "Library & Reading",
     icon: "📚",
+    image: "/images/library.jpg",
     desc: "Students visit the library weekly to choose a book at their reading level. Reading at home should be a pleasurable experience, not a chore.",
   },
   {
     title: "School Schedule",
     icon: "⏰",
+    image: "/images/school-schedule.jpg",
     desc: "Monday to Thursday: 7:00 am to 12:30 pm. Friday: 7:00 am to 11:30 am. Afternoon clubs are on Wednesdays from 11:30 am to 12:20 pm.",
   },
 ];
 
-/* ---------------------------------------------------------
-   Fallback pool used ONLY for the "Mount View in Action"
-   gallery preview. Order matters — the first images that
-   don't duplicate what's already been collected are used.
---------------------------------------------------------- */
 const FALLBACK_GALLERY_PREVIEWS = [
   "/images/council.jpg",
   "/images/sports.JPG",
@@ -381,10 +477,11 @@ const FALLBACK_GALLERY_PREVIEWS = [
 ========================================================= */
 
 export default async function SchoolLifePage() {
-  const [galleries, events, stories] = await Promise.all([
+  const [galleries, events, stories, housesResponse] = await Promise.all([
     getLatestGalleries(6),
     getUpcomingEvents(6),
     getLatestStories(6),
+    getHouses(),
   ]);
 
   const pool = buildImagePool(galleries, events, stories);
@@ -392,8 +489,17 @@ export default async function SchoolLifePage() {
   const featuredGallery = galleries[0] ?? null;
   const secondGallery = galleries[1] ?? null;
 
-  /* ---- Slot resolution ---- */
+  /* ---- Houses ---- */
+  const hasLiveHouses = housesResponse.data.length > 0;
+  const displayHouses: House[] = hasLiveHouses
+    ? housesResponse.data
+    : FALLBACK_HOUSES;
 
+  const anyPoints = displayHouses.some((h) => h.points > 0);
+  const showRankings = hasLiveHouses && anyPoints;
+  const academicYearName = housesResponse.academic_year_name ?? null;
+
+  /* ---- Slot resolution ---- */
   const heroImage =
     resolveImageUrl(featuredGallery?.cover_image) ||
     resolveImageUrl(pool[0]?.url) ||
@@ -419,26 +525,14 @@ export default async function SchoolLifePage() {
     );
   }
 
-  const featureStripImage = findImage(
-    pool,
-    ["house", "team", "competition", "sport", "gala"],
-    "/images/competition.jpg"
-  );
-
   const teamSpiritImage = findImage(
     pool,
     ["leadership", "prefect", "head boy", "head girl", "council", "captain"],
     "/images/council.jpg"
   );
 
-  /* ---------------------------------------------------------
-     "Mount View in Action" gallery preview — deduplicated.
-
-     We collect images in priority order and skip anything
-     already added, so the same URL never appears twice.
-  --------------------------------------------------------- */
+  /* ---- Gallery preview — deduplicated ---- */
   const galleryPreviewImages: string[] = [];
-
   const addUnique = (url: string | null | undefined) => {
     if (!url) return;
     if (galleryPreviewImages.length >= 4) return;
@@ -446,7 +540,6 @@ export default async function SchoolLifePage() {
     galleryPreviewImages.push(url);
   };
 
-  // 1. Featured gallery cover + its images
   if (featuredGallery) {
     if (featuredGallery.cover_image) {
       addUnique(resolveImageUrl(featuredGallery.cover_image));
@@ -456,19 +549,13 @@ export default async function SchoolLifePage() {
       if (img.image_url) addUnique(resolveImageUrl(img.image_url));
     }
   }
-
-  // 2. Second gallery cover
   if (secondGallery?.cover_image) {
     addUnique(resolveImageUrl(secondGallery.cover_image));
   }
-
-  // 3. Any images from the broader pool (events, stories, more galleries)
   for (const item of pool) {
     if (galleryPreviewImages.length >= 4) break;
     addUnique(item.url);
   }
-
-  // 4. Local fallbacks — guaranteed unique filenames
   for (const fb of FALLBACK_GALLERY_PREVIEWS) {
     if (galleryPreviewImages.length >= 4) break;
     addUnique(fb);
@@ -476,7 +563,6 @@ export default async function SchoolLifePage() {
 
   return (
     <main className="overflow-hidden bg-white text-[#172033]">
-      {/* ---------- shared animation styles ---------- */}
       <style>{`
         @keyframes mv-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(8deg)} }
         @keyframes mv-float-alt { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(14px) rotate(-8deg)} }
@@ -490,13 +576,32 @@ export default async function SchoolLifePage() {
         .mv-pop{animation:mv-pop 3.5s ease-in-out infinite}
         .mv-marquee{animation:mv-marquee 35s linear infinite}
 
+        /* Native <details> — hide default marker, rotate chevron on open */
+        details > summary { list-style: none; }
+        details > summary::-webkit-details-marker { display: none; }
+        details[open] .speech-toggle-icon { transform: rotate(180deg); }
+        details[open] .speech-label-closed { display: none; }
+        details[open] .speech-label-open { display: inline; }
+        .speech-label-open { display: none; }
+
+        /* Fill the wrapper: the client component mounts a div/iframe here */
+        .speech-video-player,
+        .speech-video-player > div,
+        .speech-video-player iframe {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          border: 0 !important;
+        }
+
         @media (prefers-reduced-motion: reduce){
           .mv-float,.mv-float-alt,.mv-blob,.mv-pop,.mv-marquee{animation:none}
         }
       `}</style>
 
       {/* =====================================================
-          HERO
+          HERO — navy
       ====================================================== */}
       <section className="relative isolate min-h-[680px] overflow-hidden bg-[#252B68]">
         <div className="absolute inset-0 z-0">
@@ -516,18 +621,10 @@ export default async function SchoolLifePage() {
           <div className="mv-blob absolute -right-24 bottom-10 h-96 w-96 rounded-full bg-[#F58220]/25 blur-3xl [animation-delay:-6s]" />
         </div>
 
-        <span className="mv-float pointer-events-none absolute left-[6%] top-[20%] z-10 text-4xl opacity-80 sm:text-5xl">
-          🏃
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[8%] top-[14%] z-10 text-4xl opacity-80 sm:text-5xl">
-          🎭
-        </span>
-        <span className="mv-float pointer-events-none absolute left-[10%] bottom-[16%] z-10 text-3xl opacity-70 sm:text-4xl">
-          🏊
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[12%] bottom-[18%] z-10 text-3xl opacity-70 sm:text-4xl">
-          💻
-        </span>
+        <span className="mv-float pointer-events-none absolute left-[6%] top-[20%] z-10 text-4xl opacity-80 sm:text-5xl">🏃</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[8%] top-[14%] z-10 text-4xl opacity-80 sm:text-5xl">🎭</span>
+        <span className="mv-float pointer-events-none absolute left-[10%] bottom-[16%] z-10 text-3xl opacity-70 sm:text-4xl">🏊</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[12%] bottom-[18%] z-10 text-3xl opacity-70 sm:text-4xl">💻</span>
 
         <div className="relative z-20 mx-auto flex min-h-[680px] max-w-7xl items-center px-4 py-20 sm:px-6 lg:px-8">
           <div className="max-w-3xl">
@@ -563,34 +660,18 @@ export default async function SchoolLifePage() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <span className="rounded-full bg-[#F58220] px-5 py-2.5 text-sm font-bold text-white shadow-lg">
-                Fun Run
-              </span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">
-                Sports Day
-              </span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">
-                Swimming Gala
-              </span>
-              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">
-                House Points
-              </span>
+              <span className="rounded-full bg-[#F58220] px-5 py-2.5 text-sm font-bold text-white shadow-lg">Fun Run</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">Sports Day</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">Swimming Gala</span>
+              <span className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-bold text-white backdrop-blur-sm transition hover:bg-white/20">House Points</span>
             </div>
 
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/admissions"
-                className="group rounded-full bg-[#F58220] px-7 py-4 text-center font-black text-white shadow-xl transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-2xl"
-              >
+              <Link href="/admissions" className="group rounded-full bg-[#F58220] px-7 py-4 text-center font-black text-white shadow-xl transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-2xl">
                 Apply for Admission
-                <span className="ml-2 inline-block transition group-hover:translate-x-1">
-                  →
-                </span>
+                <span className="ml-2 inline-block transition group-hover:translate-x-1">→</span>
               </Link>
-              <Link
-                href="/gallery"
-                className="rounded-full border-2 border-white/30 bg-white/10 px-7 py-4 text-center font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
-              >
+              <Link href="/gallery" className="rounded-full border-2 border-white/30 bg-white/10 px-7 py-4 text-center font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]">
                 View Our Gallery
               </Link>
             </div>
@@ -601,35 +682,17 @@ export default async function SchoolLifePage() {
       </section>
 
       {/* =====================================================
-          MARQUEE STRIP
+          MARQUEE STRIP — white with borders
       ====================================================== */}
       <section className="overflow-hidden border-y border-slate-200 bg-white py-4">
         <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
           {[
-            "Sports Day",
-            "Swimming Gala",
-            "Fun Run",
-            "Afternoon Clubs",
-            "Field Trips",
-            "House Competitions",
-            "Creative Arts",
-            "Student Leadership",
-            "ICT & Digital Learning",
-            "Library & Reading",
-            "School Clinic",
-            "Healthy Eating",
-            "Sports Day",
-            "Swimming Gala",
-            "Fun Run",
-            "Afternoon Clubs",
-            "Field Trips",
-            "House Competitions",
-            "Creative Arts",
-            "Student Leadership",
-            "ICT & Digital Learning",
-            "Library & Reading",
-            "School Clinic",
-            "Healthy Eating",
+            "Sports Day", "Swimming Gala", "Fun Run", "Afternoon Clubs", "Field Trips",
+            "House Competitions", "Creative Arts", "Student Leadership", "ICT & Digital Learning",
+            "Library & Reading", "School Clinic", "Healthy Eating",
+            "Sports Day", "Swimming Gala", "Fun Run", "Afternoon Clubs", "Field Trips",
+            "House Competitions", "Creative Arts", "Student Leadership", "ICT & Digital Learning",
+            "Library & Reading", "School Clinic", "Healthy Eating",
           ].map((item, i) => (
             <span
               key={`${item}-${i}`}
@@ -643,15 +706,11 @@ export default async function SchoolLifePage() {
       </section>
 
       {/* =====================================================
-          INTRO
+          INTRO — warm cream
       ====================================================== */}
-      <section className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-        <span className="mv-float pointer-events-none absolute left-[4%] top-12 text-5xl opacity-15">
-          🌟
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[4%] bottom-12 text-5xl opacity-15">
-          💡
-        </span>
+      <section className="relative overflow-hidden bg-[#FDF9EE] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+        <span className="mv-float pointer-events-none absolute left-[4%] top-12 text-5xl opacity-15">🌟</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[4%] bottom-12 text-5xl opacity-15">💡</span>
 
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-2">
           <div>
@@ -686,50 +745,36 @@ export default async function SchoolLifePage() {
 
             <div className="mt-8 flex items-center gap-4">
               <div className="h-1 w-16 rounded-full bg-[#F58220]" />
-              <p className="font-black text-[#252B68]">
-                Fostering growth, excellence and empathy.
-              </p>
+              <p className="font-black text-[#252B68]">Fostering growth, excellence and empathy.</p>
             </div>
 
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/admissions"
-                className="group inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3 font-black text-white transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-lg"
-              >
+              <Link href="/admissions" className="group inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3 font-black text-white transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-lg">
                 Apply for Admission
                 <span className="transition group-hover:translate-x-1">→</span>
               </Link>
-              <Link
-                href="/contact"
-                className="inline-flex items-center gap-2 rounded-full border-2 border-[#252B68]/20 px-6 py-3 font-black text-[#252B68] transition hover:-translate-y-1 hover:border-[#252B68] hover:bg-[#252B68] hover:text-white"
-              >
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-full border-2 border-[#252B68]/20 bg-white px-6 py-3 font-black text-[#252B68] transition hover:-translate-y-1 hover:border-[#252B68] hover:bg-[#252B68] hover:text-white">
                 Book a Visit
               </Link>
             </div>
           </div>
 
           <div className="relative isolate">
-            <div className="pointer-events-none absolute -inset-4 z-0 rounded-[2rem] bg-[#FFE900]/30 blur-2xl" />
+            <div className="pointer-events-none absolute -inset-4 z-0 rounded-[2rem] bg-[#FFE900]/40 blur-2xl" />
             <div className="relative z-10 overflow-hidden rounded-[2rem] shadow-2xl ring-1 ring-slate-100">
-              <ImageWithFallback
-                src={introImage}
-                alt="Learners enjoying activities at Mount View"
-                className="aspect-[4/5] w-full sm:aspect-[4/3]"
-              />
+              <ImageWithFallback src={introImage} alt="Learners enjoying activities at Mount View" className="aspect-[4/5] w-full sm:aspect-[4/3]" />
             </div>
             <div className="absolute -bottom-7 -left-5 z-20 rounded-2xl bg-[#FFE900] px-6 py-5 text-[#252B68] shadow-2xl sm:-left-8">
               <p className="text-3xl font-black">Every Child</p>
               <p className="mt-1 font-black">Has a place to shine.</p>
             </div>
-            <span className="mv-float-alt pointer-events-none absolute -right-4 -top-4 z-20 text-4xl">
-              ✨
-            </span>
+            <span className="mv-float-alt pointer-events-none absolute -right-4 -top-4 z-20 text-4xl">✨</span>
           </div>
         </div>
       </section>
 
       {/* =====================================================
-          EXPERIENCE GRID
+          EXPERIENCE GRID — slate-50
       ====================================================== */}
       <section className="relative overflow-hidden bg-slate-50 px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
         <div className="pointer-events-none absolute inset-0">
@@ -743,30 +788,19 @@ export default async function SchoolLifePage() {
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
               Explore School Life
             </p>
-            <h2 className="mt-4 text-3xl font-black text-[#252B68] sm:text-4xl">
-              Learning beyond the classroom.
-            </h2>
+            <h2 className="mt-4 text-3xl font-black text-[#252B68] sm:text-4xl">Learning beyond the classroom.</h2>
             <p className="mt-5 leading-8 text-slate-600">
-              Our learners experience a broad range of activities designed to
-              develop the whole child.
+              Our learners experience a broad range of activities designed to develop the whole child.
             </p>
           </div>
 
           <div className="mt-12 grid gap-7 md:grid-cols-2 lg:grid-cols-3">
             {experienceSlots.map((slot) => {
               const resolved = experienceImages[slot.key];
-
               return (
-                <article
-                  key={slot.title}
-                  className="group overflow-hidden rounded-[2rem] bg-white shadow-lg ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
-                >
+                <article key={slot.title} className="group overflow-hidden rounded-[2rem] bg-white shadow-lg ring-1 ring-slate-100 transition duration-300 hover:-translate-y-2 hover:shadow-2xl">
                   <div className="relative isolate overflow-hidden">
-                    <ImageWithFallback
-                      src={resolved.url}
-                      alt={slot.title}
-                      className="aspect-[4/3] w-full transition duration-500 group-hover:scale-105"
-                    />
+                    <ImageWithFallback src={resolved.url} alt={slot.title} className="aspect-[4/3] w-full transition duration-500 group-hover:scale-105" />
                     <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
                     <div className="absolute left-5 top-5 z-20 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-2xl shadow-lg transition group-hover:scale-110">
                       {slot.icon}
@@ -777,29 +811,12 @@ export default async function SchoolLifePage() {
                       </div>
                     )}
                   </div>
-
                   <div className="p-7">
-                    <div
-                      className={`mb-4 h-1 w-12 rounded-full ${
-                        slot.accent === "yellow"
-                          ? "bg-[#FFE900]"
-                          : slot.accent === "orange"
-                          ? "bg-[#F58220]"
-                          : "bg-[#252B68]"
-                      }`}
-                    />
-                    <h3 className="text-xl font-black text-[#252B68]">
-                      {slot.title}
-                    </h3>
-                    <p className="mt-3 text-sm leading-7 text-slate-600">
-                      {slot.text}
-                    </p>
-                    <Link
-                      href="/gallery"
-                      className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[#F58220] transition group-hover:gap-3"
-                    >
-                      See more
-                      <span>→</span>
+                    <div className={`mb-4 h-1 w-12 rounded-full ${slot.accent === "yellow" ? "bg-[#FFE900]" : slot.accent === "orange" ? "bg-[#F58220]" : "bg-[#252B68]"}`} />
+                    <h3 className="text-xl font-black text-[#252B68]">{slot.title}</h3>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{slot.text}</p>
+                    <Link href="/gallery" className="mt-5 inline-flex items-center gap-2 text-sm font-black text-[#F58220] transition group-hover:gap-3">
+                      See more <span>→</span>
                     </Link>
                   </div>
                 </article>
@@ -810,98 +827,262 @@ export default async function SchoolLifePage() {
       </section>
 
       {/* =====================================================
-          HOUSE SYSTEM
+          HOUSE SYSTEM — navy
       ====================================================== */}
       <section className="relative isolate overflow-hidden bg-[#252B68] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
         <div className="pointer-events-none absolute -left-32 -top-32 z-0 h-96 w-96 rounded-full bg-[#FFE900]/10 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 right-0 z-0 h-[30rem] w-[30rem] rounded-full bg-[#F58220]/20 blur-3xl" />
 
-        <span className="mv-float pointer-events-none absolute left-[6%] top-16 text-5xl opacity-25">
-          🏆
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-16 text-5xl opacity-25">
-          🎉
-        </span>
+        <span className="mv-float pointer-events-none absolute left-[6%] top-16 text-5xl opacity-25">🏆</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-16 text-5xl opacity-25">🎉</span>
 
-        <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
-          <div>
+        <div className="relative z-10 mx-auto max-w-7xl">
+          {/* Centered header */}
+          <div className="mx-auto max-w-3xl text-center">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
               The House System
             </p>
-
             <h2 className="mt-4 text-3xl font-black text-white sm:text-4xl">
               Fostering camaraderie and belonging.
             </h2>
-
-            <p className="mt-6 leading-8 text-blue-100">
+            <p className="mt-5 leading-8 text-blue-100">
               Every student and staff member is assigned to one of four Houses.
               Throughout the year, students compete in events such as the Fun
               Run, Sports Day, and Swimming Gala, earning points for their
               respective Houses.
             </p>
-
-            {/* ---- Houses (badge images instead of emoji icons) ---- */}
-            <div className="mt-8 grid grid-cols-2 gap-4">
-              {houses.map((house) => (
-                <div
-                  key={house.name}
-                  className={`flex items-center gap-3 rounded-xl p-4 font-black shadow-md transition hover:scale-[1.03] ${house.color}`}
-                >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-2 ring-white/60">
-                    <ImageWithFallback
-                      src={house.image}
-                      alt={house.alt}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <span className="leading-tight">{house.name}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8">
-              <Link
-                href="/admissions"
-                className="group inline-flex items-center gap-2 rounded-full bg-[#F58220] px-6 py-3 font-black text-white transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-lg"
-              >
-                Apply for Admission
-                <span className="transition group-hover:translate-x-1">→</span>
-              </Link>
-            </div>
+            {academicYearName && (
+              <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#FFE900]/15 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#FFE900]" />
+                Standings · {academicYearName}
+              </p>
+            )}
           </div>
 
-          <div className="relative isolate">
-            <div className="pointer-events-none absolute -inset-4 z-0 rounded-[2rem] bg-[#FFE900]/10 blur-2xl" />
-            <div className="relative z-10 overflow-hidden rounded-[2rem] border-4 border-white/10 shadow-2xl">
-              <ImageWithFallback
-                src={featureStripImage.url}
-                alt="House competition at Mount View"
-                className="aspect-[4/3] w-full"
-              />
-            </div>
-            <div className="absolute -bottom-6 -right-4 z-20 rounded-2xl bg-[#FFE900] px-6 py-5 text-[#252B68] shadow-2xl sm:-right-8">
-              <p className="text-xs font-black uppercase tracking-widest text-[#252B68]/70">
-                Friendly Competition
+          {showRankings ? (
+            <>
+              {/* ---- CHAMPION SHOWCASE — points LEFT, featured image RIGHT ---- */}
+              <div className="mt-14 overflow-hidden rounded-[2rem] border-2 border-[#FFE900]/50 bg-[#1c2260] shadow-2xl">
+                <div className="grid lg:grid-cols-[1fr_1.1fr]">
+                  {/* LEFT: points + name */}
+                  <div className="relative flex flex-col justify-center p-8 sm:p-10 lg:p-12">
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#FFE900]/12 via-transparent to-[#F58220]/10" />
+                    <div className="relative">
+                      <div className="inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#252B68] shadow-lg">
+                        🏆 Current Champion
+                      </div>
+
+                      <p className="mt-6 text-6xl font-black leading-none text-[#FFE900] sm:text-7xl lg:text-8xl">
+                        {displayHouses[0].points.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-[10px] font-black uppercase tracking-[0.3em] text-[#FFE900]/70">
+                        points
+                      </p>
+
+                      <div className="mt-8 h-px w-16 bg-white/20" />
+
+                      <h3 className="mt-6 text-2xl font-black text-white sm:text-3xl">
+                        {displayHouses[0].name}
+                      </h3>
+                      {displayHouses[0].code && (
+                        <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">
+                          {displayHouses[0].code}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* RIGHT: featured image (or logo fallback, or colour block) */}
+                  <div className="relative min-h-[280px] lg:min-h-full">
+                    {displayHouses[0].featured_image_url ? (
+                      <ImageWithFallback
+                        src={displayHouses[0].featured_image_url}
+                        alt={displayHouses[0].name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : displayHouses[0].image_url ? (
+                      <>
+                        <ImageWithFallback
+                          src={displayHouses[0].image_url}
+                          alt={displayHouses[0].name}
+                          className="h-full w-full object-cover"
+                        />
+                        <div className="pointer-events-none absolute inset-0 bg-[#1c2260]/25" />
+                        <span className="absolute bottom-3 right-3 z-10 rounded-full bg-black/50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-white/80 backdrop-blur">
+                          Using house logo
+                        </span>
+                      </>
+                    ) : (
+                      <div
+                        className="flex h-full w-full items-center justify-center"
+                        style={{ backgroundColor: displayHouses[0].colour }}
+                      >
+                        <span
+                          className="text-6xl font-black sm:text-7xl"
+                          style={{ color: contrastText(displayHouses[0].colour) }}
+                        >
+                          {(displayHouses[0].code || displayHouses[0].name)
+                            .slice(0, 2)
+                            .toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-[#1c2260]/60 lg:to-[#1c2260]" />
+                  </div>
+                </div>
+              </div>
+
+              {/* ---- LEADERBOARD — points LEFT, house logo RIGHT ---- */}
+              <div className="mt-6 grid gap-3 lg:grid-cols-2">
+                {displayHouses.map((house) => {
+                  const isFirst = house.position === 1;
+                  const textOnColour = contrastText(house.colour);
+
+                  return (
+                    <div
+                      key={house.id}
+                      className={`group relative flex items-center gap-3 overflow-hidden rounded-2xl border p-3.5 backdrop-blur-sm transition hover:-translate-y-0.5 sm:gap-4 sm:p-4 ${
+                        isFirst
+                          ? "border-[#FFE900]/60 bg-gradient-to-r from-[#FFE900]/15 to-white/5"
+                          : "border-white/10 bg-white/5 hover:bg-white/10"
+                      }`}
+                    >
+                      {/* LEFT: position badge + points */}
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div
+                          className={`flex h-11 w-11 items-center justify-center rounded-xl text-xs font-black shadow-lg sm:h-12 sm:w-12 sm:text-sm ${
+                            isFirst
+                              ? "bg-[#FFE900] text-[#252B68]"
+                              : "bg-white/10 text-white/90"
+                          }`}
+                        >
+                          {isFirst ? "🏆" : ordinal(house.position)}
+                        </div>
+
+                        <div className="min-w-[64px] text-left">
+                          <p
+                            className="text-2xl font-black leading-none"
+                            style={{
+                              color: isFirst ? "#FFE900" : house.colour,
+                            }}
+                          >
+                            {house.points.toLocaleString()}
+                          </p>
+                          <p className="mt-0.5 text-[9px] font-black uppercase tracking-widest text-white/50">
+                            pts
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* CENTER: name + code */}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-base font-black text-white sm:text-lg">
+                          {house.name}
+                        </p>
+                        {house.code && (
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">
+                            {house.code}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* RIGHT: house logo */}
+                      <div
+                        className="h-14 w-14 shrink-0 overflow-hidden rounded-full sm:h-16 sm:w-16"
+                        style={{ boxShadow: `0 0 0 2px ${house.colour}` }}
+                      >
+                        {house.image_url ? (
+                          <ImageWithFallback
+                            src={house.image_url}
+                            alt={house.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="flex h-full w-full items-center justify-center text-sm font-black"
+                            style={{
+                              backgroundColor: house.colour,
+                              color: textOnColour,
+                            }}
+                          >
+                            {(house.code || house.name).slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            /* ---- Pre-season: no points yet ---- */
+            <div className="mt-14 space-y-8">
+              <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {displayHouses.map((house) => {
+                  const textOnColour = contrastText(house.colour);
+                  return (
+                    <div
+                      key={house.id}
+                      className="flex items-center gap-3 rounded-xl p-4 font-black shadow-md transition hover:scale-[1.03]"
+                      style={{
+                        backgroundColor: house.colour,
+                        color: textOnColour,
+                      }}
+                    >
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-2 ring-white/60">
+                        {house.image_url ? (
+                          <ImageWithFallback
+                            src={house.image_url}
+                            alt={house.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span
+                            className="text-xs font-black"
+                            style={{ color: house.colour }}
+                          >
+                            {(house.code || house.name).slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <span className="leading-tight">{house.name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <p className="mx-auto max-w-2xl text-center text-sm font-bold uppercase tracking-[0.2em] text-blue-100/70">
+                Points will appear here as competitions get underway.
               </p>
-              <p className="mt-1 text-lg font-black">
-                Teamwork. Spirit. Pride.
-              </p>
             </div>
+          )}
+
+          {/* CTA */}
+          <div className="mt-14 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <Link
+              href="/admissions"
+              className="group inline-flex items-center gap-2 rounded-full bg-[#F58220] px-7 py-3.5 font-black text-white transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-lg"
+            >
+              Apply for Admission
+              <span className="transition group-hover:translate-x-1">→</span>
+            </Link>
+            <Link
+              href="/gallery"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 bg-white/10 px-7 py-3.5 font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
+            >
+              View House Photos
+            </Link>
           </div>
         </div>
       </section>
 
       {/* =====================================================
-          STUDENT LEADERSHIP
+          STUDENT LEADERSHIP — white
       ====================================================== */}
       <section className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-        <span className="mv-float pointer-events-none absolute left-[3%] top-12 text-5xl opacity-15">
-          🎤
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[3%] bottom-12 text-5xl opacity-15">
-          🏛️
-        </span>
+        <span className="mv-float pointer-events-none absolute left-[3%] top-12 text-5xl opacity-15">🎤</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[3%] bottom-12 text-5xl opacity-15">🏛️</span>
 
         <div className="relative mx-auto max-w-7xl">
           <div className="mb-12 grid items-end gap-8 md:grid-cols-2">
@@ -935,6 +1116,149 @@ export default async function SchoolLifePage() {
             ))}
           </div>
 
+          {/* ---- Head Boy & Head Girl Speeches (with video + transcript) ---- */}
+          <div className="mt-16">
+            <div className="mx-auto max-w-3xl text-center">
+              <p className="inline-flex items-center gap-2 rounded-full bg-[#252B68]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#252B68]">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                A word from our leaders
+              </p>
+              <h3 className="mt-4 text-2xl font-black text-[#252B68] sm:text-3xl">
+                Head Boy &amp; Head Girl Speeches
+              </h3>
+              <p className="mt-4 leading-8 text-slate-600">
+                Watch their speeches or read the full transcripts below. Only
+                one video plays at a time — starting one will pause the other.
+              </p>
+            </div>
+
+            <div className="mt-10 grid gap-6 lg:grid-cols-2">
+              {leadershipSpeeches.map((speech) => {
+                const accent =
+                  speech.role === "Head Boy" ? "#F58220" : "#252B68";
+
+                const hasVideo =
+                  speech.video !== null &&
+                  (speech.video.type === "file" ||
+                    (speech.video.type === "youtube" &&
+                      speech.video.id.trim().length > 0));
+
+                return (
+                  <article
+                    key={speech.role}
+                    className="group relative overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
+                  >
+                    {/* Top accent bar */}
+                    <div
+                      className="h-2 w-full"
+                      style={{ backgroundColor: accent }}
+                    />
+
+                    <div className="p-5 sm:p-7">
+                      {/* ---- Video (client component — coordinates pause/play) ---- */}
+                      {hasVideo && (
+                        <div className="relative mb-6 aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-lg ring-1 ring-slate-200">
+                          <SpeechVideoPlayer
+                            video={speech.video}
+                            title={`${speech.role} speech`}
+                          />
+                        </div>
+                      )}
+
+                      {/* Quote mark */}
+                      <span
+                        className="block text-5xl font-black leading-none"
+                        style={{ color: `${accent}33` }}
+                        aria-hidden="true"
+                      >
+                        &ldquo;
+                      </span>
+
+                      {/* Key quote */}
+                      <p className="text-lg font-bold italic leading-relaxed text-[#252B68] sm:text-xl">
+                        {speech.quote}
+                      </p>
+
+                      {/* Author */}
+                      <div className="mt-6 flex items-center gap-4 border-t border-slate-100 pt-5">
+                        <div
+                          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full font-black text-white shadow-lg"
+                          style={{ backgroundColor: accent }}
+                        >
+                          {speech.image ? (
+                            <ImageWithFallback
+                              src={speech.image}
+                              alt={speech.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-sm tracking-wider">
+                              {speech.initials}
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-lg font-black text-[#252B68]">
+                            {speech.name}
+                          </p>
+                          <p
+                            className="text-xs font-bold uppercase tracking-widest"
+                            style={{ color: accent }}
+                          >
+                            {speech.role} · {speech.grade}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* ---- Transcript toggle ---- */}
+                      {speech.transcript.length > 0 && (
+                        <details className="mt-6 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70">
+                          <summary
+                            className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-black text-[#252B68] transition hover:bg-slate-100"
+                            aria-label={`Toggle ${speech.role} transcript`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span aria-hidden="true">📄</span>
+                              <span className="speech-label-closed">
+                                Read the full transcript
+                              </span>
+                              <span className="speech-label-open">
+                                Hide transcript
+                              </span>
+                            </span>
+                            <svg
+                              className="speech-toggle-icon h-4 w-4 shrink-0 text-[#252B68] transition-transform duration-200"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </summary>
+
+                          <div className="space-y-3 border-t border-slate-200/70 px-4 py-4">
+                            {speech.transcript.map((para, i) => (
+                              <p
+                                key={i}
+                                className="text-sm leading-7 text-slate-600"
+                              >
+                                {para}
+                              </p>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-12 overflow-hidden rounded-[2rem] shadow-xl ring-1 ring-slate-100">
             <div className="relative aspect-[16/6] w-full">
               <ImageWithFallback
@@ -958,15 +1282,11 @@ export default async function SchoolLifePage() {
       </section>
 
       {/* =====================================================
-          DAILY LIFE & WELLBEING
+          DAILY LIFE & WELLBEING — yellow
       ====================================================== */}
       <section className="relative overflow-hidden bg-[#FFE900] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-        <span className="mv-float pointer-events-none absolute left-[5%] top-8 text-5xl opacity-30">
-          🍎
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[5%] bottom-8 text-5xl opacity-30">
-          💛
-        </span>
+        <span className="mv-float pointer-events-none absolute left-[5%] top-8 text-5xl opacity-30">🍎</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[5%] bottom-8 text-5xl opacity-30">💛</span>
 
         <div className="relative mx-auto max-w-7xl">
           <div className="mx-auto mb-14 max-w-3xl text-center">
@@ -981,36 +1301,46 @@ export default async function SchoolLifePage() {
 
           <div className="grid gap-6 md:grid-cols-2">
             {dailyLifeInfo.map((info) => (
-              <div
+              <article
                 key={info.title}
-                className="group rounded-3xl bg-white p-8 shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
+                className="group overflow-hidden rounded-3xl bg-white shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
               >
-                <div className="mb-4 flex items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F58220]/10 text-2xl transition group-hover:scale-110 group-hover:bg-[#F58220]/20">
+                <div className="relative aspect-[16/9] overflow-hidden">
+                  <ImageWithFallback
+                    src={info.image}
+                    alt={info.title}
+                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                  <div className="absolute left-4 top-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/95 text-2xl shadow-lg backdrop-blur transition group-hover:scale-110">
                     {info.icon}
                   </div>
+                </div>
+
+                <div className="p-6 sm:p-7">
                   <h3 className="text-xl font-black text-[#252B68]">
                     {info.title}
                   </h3>
+                  <p className="mt-3 leading-7 text-slate-600">
+                    {info.desc}
+                  </p>
                 </div>
-                <p className="leading-7 text-slate-600">{info.desc}</p>
-              </div>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
       {/* =====================================================
-          GALLERY PROMOTION — "See Mount View in Action"
-          (deduplicated images — same URL never appears twice)
+          GALLERY PROMOTION — warm cream
       ====================================================== */}
-      <section className="relative overflow-hidden bg-white px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+      <section className="relative overflow-hidden bg-[#FDF9EE] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-2">
           <div className="grid grid-cols-2 gap-4">
             {galleryPreviewImages.map((src, index) => (
               <div
                 key={`${src}-${index}`}
-                className={`group overflow-hidden rounded-3xl shadow-lg ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
+                className={`group overflow-hidden rounded-3xl bg-white shadow-lg ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl ${
                   index === 1 ? "mt-8" : ""
                 } ${index === 2 ? "-mt-4" : ""}`}
               >
@@ -1036,19 +1366,11 @@ export default async function SchoolLifePage() {
               activities, and moments that make life at Mount View special.
             </p>
             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-              <Link
-                href="/gallery"
-                className="group rounded-full bg-[#252B68] px-7 py-3.5 text-center font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#171B4A] hover:shadow-xl"
-              >
+              <Link href="/gallery" className="group rounded-full bg-[#252B68] px-7 py-3.5 text-center font-black text-white shadow-lg transition hover:-translate-y-1 hover:bg-[#171B4A] hover:shadow-xl">
                 Explore Our Gallery
-                <span className="ml-2 inline-block transition group-hover:translate-x-1">
-                  →
-                </span>
+                <span className="ml-2 inline-block transition group-hover:translate-x-1">→</span>
               </Link>
-              <Link
-                href="/news"
-                className="rounded-full border-2 border-[#252B68] px-7 py-3.5 text-center font-black text-[#252B68] transition hover:-translate-y-1 hover:bg-[#252B68] hover:text-white"
-              >
+              <Link href="/news" className="rounded-full border-2 border-[#252B68] bg-white px-7 py-3.5 text-center font-black text-[#252B68] transition hover:-translate-y-1 hover:bg-[#252B68] hover:text-white">
                 School News
               </Link>
             </div>
@@ -1057,21 +1379,18 @@ export default async function SchoolLifePage() {
       </section>
 
       {/* =====================================================
-          PARENT PROMOTION
+          FOR FAMILIES — orange band
+          (distinct from the navy newsletter subscription below)
       ====================================================== */}
-      <section className="relative isolate overflow-hidden bg-[#252B68] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
-        <div className="pointer-events-none absolute -left-32 -top-32 z-0 h-96 w-96 rounded-full bg-[#FFE900]/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-40 right-0 z-0 h-[30rem] w-[30rem] rounded-full bg-[#F58220]/20 blur-3xl" />
-        <span className="mv-float pointer-events-none absolute left-[8%] top-10 text-4xl opacity-30">
-          👨‍👩‍👧
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[8%] bottom-10 text-4xl opacity-30">
-          📖
-        </span>
+      <section className="relative isolate overflow-hidden bg-[#F58220] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
+        <div className="pointer-events-none absolute -left-32 -top-32 z-0 h-96 w-96 rounded-full bg-white/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-40 right-0 z-0 h-[30rem] w-[30rem] rounded-full bg-[#FFE900]/25 blur-3xl" />
+        <span className="mv-float pointer-events-none absolute left-[8%] top-10 text-4xl opacity-30">👨‍👩‍👧</span>
+        <span className="mv-float-alt pointer-events-none absolute right-[8%] bottom-10 text-4xl opacity-30">📖</span>
 
         <div className="relative z-10 mx-auto max-w-5xl text-center">
-          <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+          <p className="inline-flex items-center gap-2 rounded-full bg-white/20 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-white backdrop-blur-sm">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
             For Families
           </p>
 
@@ -1079,56 +1398,26 @@ export default async function SchoolLifePage() {
             Give your child a school experience they can grow into.
           </h2>
 
-          <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-blue-100">
+          <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-white/90">
             We value the role parents and families play in supporting children
             as they grow. Our homework is designed to nurture a love of reading
             and to strengthen literacy skills.
           </p>
 
-          <p className="mx-auto mt-3 inline-block max-w-3xl rounded-full bg-white/10 px-5 py-2 text-base font-bold text-[#FFE900] backdrop-blur">
+          <p className="mx-auto mt-4 inline-block max-w-3xl rounded-full bg-white/15 px-5 py-2 text-base font-bold text-white ring-1 ring-white/30 backdrop-blur-sm">
             Homework is assigned every Tuesday and should be returned the
             following Monday.
           </p>
 
           <div className="mt-9 flex flex-col justify-center gap-4 sm:flex-row">
-            <Link
-              href="/admissions"
-              className="group rounded-full bg-[#F58220] px-8 py-4 font-black text-white shadow-xl transition hover:-translate-y-1 hover:bg-[#d96e12] hover:shadow-2xl"
-            >
+            <Link href="/admissions" className="group rounded-full bg-white px-8 py-4 font-black text-[#F58220] shadow-xl transition hover:-translate-y-1 hover:bg-[#FFE900] hover:text-[#252B68] hover:shadow-2xl">
               Apply for Admission
-              <span className="ml-2 inline-block transition group-hover:translate-x-1">
-                →
-              </span>
+              <span className="ml-2 inline-block transition group-hover:translate-x-1">→</span>
             </Link>
-            <Link
-              href="/contact"
-              className="rounded-full border-2 border-white/30 bg-white/10 px-8 py-4 font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#252B68]"
-            >
+            <Link href="/contact" className="rounded-full border-2 border-white/50 bg-white/10 px-8 py-4 font-black text-white backdrop-blur-sm transition hover:-translate-y-1 hover:bg-white hover:text-[#F58220]">
               Contact the School
             </Link>
           </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          BRAND STATEMENT
-      ====================================================== */}
-      <section className="relative overflow-hidden border-t border-slate-100 bg-white px-4 py-14 text-center sm:px-6 lg:px-8">
-        <span className="mv-float pointer-events-none absolute left-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
-          ✨
-        </span>
-        <span className="mv-float-alt pointer-events-none absolute right-[15%] top-1/2 -translate-y-1/2 text-3xl opacity-30">
-          💛
-        </span>
-        <div className="relative mx-auto max-w-4xl">
-          <p className="text-2xl font-black text-[#252B68] sm:text-3xl">
-            Fostering <span className="text-[#F58220]">growth</span>,{" "}
-            <span className="text-[#252B68]">excellence</span> and{" "}
-            <span className="text-[#F58220]">empathy</span>.
-          </p>
-          <p className="mt-3 text-sm font-medium text-slate-500">
-            Mount View International Primary School &amp; Early Years Centre
-          </p>
         </div>
       </section>
     </main>
