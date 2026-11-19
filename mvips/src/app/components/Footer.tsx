@@ -14,7 +14,7 @@ const exploreLinks = [
   { name: "Top Achievers", href: "/top-achievers" },
   { name: "News & Stories", href: "/news" },
   { name: "Newsletters", href: "/newsletters" },
-  { name: "Policies", href: "/policies" },      /* ⬅️ NEW */
+  { name: "Policies", href: "/policies" },
   { name: "Gallery", href: "/gallery" },
 ];
 
@@ -28,7 +28,7 @@ const learningLinks = [
 const socialLinks = [
   {
     name: "Facebook",
-    href: "https://www.facebook.com/",
+    href: "https://www.facebook.com/mountviewprimary/",
     label: "Follow us on Facebook",
     bg: "#1877F2",
     hoverBg: "#0f5cc0",
@@ -39,8 +39,56 @@ const socialLinks = [
     ),
   },
   {
+    name: "Instagram",
+    href: "https://www.instagram.com/mountviewprimary/",
+    label: "Follow us on Instagram",
+    bg: "#E4405F",
+    hoverBg: "#b8334d",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.43.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.43.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41a3.72 3.72 0 0 1-1.38-.9 3.72 3.72 0 0 1-.9-1.38c-.16-.43-.36-1.06-.41-2.23-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.43-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 5.78.13 4.9.33 4.14.63c-.79.31-1.46.72-2.13 1.38A5.88 5.88 0 0 0 .63 4.14C.33 4.9.13 5.78.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.06 1.27.26 2.15.56 2.91.31.79.72 1.46 1.38 2.13.67.66 1.34 1.07 2.13 1.38.76.3 1.64.5 2.91.56C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c1.27-.06 2.15-.26 2.91-.56.79-.31 1.46-.72 2.13-1.38a5.88 5.88 0 0 0 1.38-2.13c.3-.76.5-1.64.56-2.91.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95c-.06-1.27-.26-2.15-.56-2.91a5.88 5.88 0 0 0-1.38-2.13A5.88 5.88 0 0 0 19.86.63c-.76-.3-1.64-.5-2.91-.56C15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zm0 10.16A4 4 0 1 1 16 12a4 4 0 0 1-4 4zM19.85 5.6a1.44 1.44 0 1 1-1.44-1.44 1.44 1.44 0 0 1 1.44 1.44z" />
+      </svg>
+    ),
+  },
+  {
+    name: "X",
+    href: "https://x.com/MountViewInt",
+    label: "Follow us on X",
+    bg: "#000000",
+    hoverBg: "#1a1a1a",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.63 7.58H.48l8.6-9.83L0 1.15h7.6l5.24 6.93 6.06-6.93zm-1.29 19.5h2.04L6.48 3.24H4.29L17.61 20.65z" />
+      </svg>
+    ),
+  },
+  {
+    name: "LinkedIn",
+    href: "https://mw.linkedin.com/company/mountviewprimary",
+    label: "Follow us on LinkedIn",
+    bg: "#0A66C2",
+    hoverBg: "#084d93",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.86 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z" />
+      </svg>
+    ),
+  },
+  {
+    name: "YouTube",
+    href: "https://www.youtube.com/@mountviewinternational3707",
+    label: "Subscribe on YouTube",
+    bg: "#FF0000",
+    hoverBg: "#cc0000",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
+        <path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.3 31.3 0 0 0 0 12a31.3 31.3 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.3 31.3 0 0 0 24 12a31.3 31.3 0 0 0-.5-5.8zM9.6 15.6V8.4l6.2 3.6-6.2 3.6z" />
+      </svg>
+    ),
+  },
+  {
     name: "TikTok",
-    href: "https://www.tiktok.com/",
+    href: "https://www.tiktok.com/@mountviewinternational",
     label: "Follow us on TikTok",
     bg: "#000000",
     hoverBg: "#1a1a1a",
@@ -166,7 +214,7 @@ export default function Footer() {
               href="/"
               className="group inline-flex items-center gap-4 transition hover:opacity-95"
             >
-              <div className="relative shrink-0 overflow-hidden rounded-2xl ft-logo-shine">
+              <div className="relative shrink-0 overflow-hidden rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-white/20 ft-logo-shine">
                 <Image
                   src="/logo12.png"
                   alt="Mount View International Primary School logo"
@@ -209,7 +257,7 @@ export default function Footer() {
 
             {/* SOCIAL + ARCHIVE — icons left, archive right */}
             <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {socialLinks.map((social) => (
                   <a
                     key={social.name}
@@ -302,6 +350,7 @@ export default function Footer() {
             </h3>
 
             <div className="mt-5 space-y-4 text-sm">
+              {/* Address */}
               <a
                 href="https://www.google.com/maps/place/Mount+View+International+Primary+School+and+Early+Years+Centre/@-15.7960625,35.0714375,17z"
                 target="_blank"
@@ -319,6 +368,7 @@ export default function Footer() {
                 </span>
               </a>
 
+              {/* Phone */}
               <a
                 href="tel:+265997355319"
                 className="group flex items-center gap-3 text-blue-100 transition hover:text-white"
@@ -329,6 +379,7 @@ export default function Footer() {
                 <span>0997 355 319</span>
               </a>
 
+              {/* General enquiries */}
               <a
                 href="mailto:info@mountviewmw.com"
                 className="group flex items-start gap-3 break-all text-blue-100 transition hover:text-white"
@@ -336,7 +387,44 @@ export default function Footer() {
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-base transition group-hover:bg-white/10">
                   ✉️
                 </span>
-                <span>info@mountviewmw.com</span>
+                <span>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-200/80">
+                    General enquiries
+                  </span>
+                  info@mountviewmw.com
+                </span>
+              </a>
+
+              {/* Headteacher */}
+              <a
+                href="mailto:headteacher@mountviewmw.com"
+                className="group flex items-start gap-3 break-all text-blue-100 transition hover:text-white"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-base transition group-hover:bg-white/10">
+                  🎓
+                </span>
+                <span>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-200/80">
+                    Headteacher
+                  </span>
+                  headteacher@mountviewmw.com
+                </span>
+              </a>
+
+              {/* Admissions */}
+              <a
+                href="mailto:admissions@mountviewmw.com"
+                className="group flex items-start gap-3 break-all text-blue-100 transition hover:text-white"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/5 text-base transition group-hover:bg-white/10">
+                  📝
+                </span>
+                <span>
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-blue-200/80">
+                    Admissions
+                  </span>
+                  admissions@mountviewmw.com
+                </span>
               </a>
             </div>
 

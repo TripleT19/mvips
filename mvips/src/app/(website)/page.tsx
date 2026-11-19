@@ -1,6 +1,69 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import ImageWithFallback from "../components/ImageWithFallback";
+
+/* =========================================================
+   SEO — page-level metadata
+========================================================= */
+
+export const metadata: Metadata = {
+  title:
+    "Mount View International Primary School — Cambridge Primary & Early Years in Blantyre, Malawi",
+  description:
+    "Mount View International Primary School & Early Years Centre is a leading Cambridge curriculum international school in Blantyre, Malawi for children aged 20 months to 11 years. Register your child for the best early years and primary education in Malawi.",
+  keywords: [
+    // Location + intent
+    "international school Blantyre",
+    "best international schools in Blantyre",
+    "best international primary school in Blantyre",
+    "international primary school Blantyre Malawi",
+    "primary school Blantyre",
+    "primary school Malawi",
+    "best primary school in Malawi",
+    "private school Blantyre",
+    "preschool Blantyre",
+    "early years Blantyre",
+    "early years centre Blantyre",
+    // Curriculum
+    "Cambridge Primary Malawi",
+    "Cambridge curriculum Malawi",
+    "Cambridge school Blantyre",
+    "Cambridge Checkpoint Malawi",
+    "Cambridge Early Years Malawi",
+    "Cambridge international school",
+    // Brand
+    "Mount View International Primary School",
+    "Mount View Primary School",
+    "Mount View Early Years Centre",
+    "Mount View International Blantyre",
+    // Subject / feature
+    "primary school with swimming pool Blantyre",
+    "school with early years centre Malawi",
+    "English medium primary school Malawi",
+    "Jolly Phonics Malawi",
+  ],
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Mount View International Primary School",
+    title:
+      "Mount View International Primary School — Cambridge Primary & Early Years in Blantyre, Malawi",
+    description:
+      "A leading Cambridge curriculum international school in Blantyre, Malawi — from Early Years to Year 6. Fostering growth, excellence and empathy.",
+    locale: "en_MW",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title:
+      "Mount View International Primary School — Cambridge Primary & Early Years in Blantyre, Malawi",
+    description:
+      "A leading Cambridge curriculum international school in Blantyre, Malawi — from Early Years to Year 6.",
+  },
+};
 
 /* =========================================================
    API / BACKEND HELPERS
@@ -99,7 +162,7 @@ async function fetchJson(path: string): Promise<unknown> {
     try {
       text = await res.text();
     } catch (readErr) {
-      console.error(`[home] GET ${url} — failed to read body:`, readErr);
+      console.error(`[home] GET ${url} failed to read body:`, readErr);
       return null;
     }
 
@@ -208,14 +271,13 @@ const BRAND_VALUES = [
    STATIC BRAND CONTENT
 ========================================================= */
 
-/* Two grouped Cambridge stages — hrefs deep-link to /academics anchors */
 const stageHighlights = [
   {
     number: "01",
     title: "Cambridge Early Years",
-    years: "Pre-Nursery · Nursery · Reception · 18 months – 5 years",
+    years: "Pre-Nursery · Nursery · Reception · 20 months – 5 years",
     description:
-      "A joyful first step. We follow the Cambridge Early Years framework, blending play-based learning with specialist subjects such as ICT, Swimming, PE, Art and Music — building curiosity, confidence and a love of learning from the very start.",
+      "A joyful first step. We follow the Cambridge Early Years framework, blending play-based learning with specialist subjects such as ICT, Swimming, PE, Art and Music, building curiosity, confidence and a love of learning from the very start.",
     image: "/images/ey.jpg",
     href: "/academics#early-years",
   },
@@ -230,41 +292,45 @@ const stageHighlights = [
   },
 ];
 
+/* =========================================================
+   LEARNING AREAS — each under 50 words
+========================================================= */
+
 const learningAreas = [
   {
-    title: "Cambridge Curriculum",
+    title: "Skill Enhancement",
     description:
-      "Fully registered with Cambridge Examinations. Year 6 students take the Cambridge Checkpoint Exams annually.",
-    icon: "🎓",
+      "Specialist lessons, projects and clubs build public speaking, teamwork, digital literacy, coding, problem-solving and critical thinking. Children practise planning, collaboration and presentation, developing resilience, adaptability and self-awareness for secondary school and life.",
+    icon: "🎯",
   },
   {
     title: "Jolly Phonics",
     description:
-      "A multi-sensory synthetic phonics method used in Early Years and Key Stage 1 to get children reading and writing from an early age.",
+      "Jolly Phonics is a multi-sensory synthetic phonics method. Each of the 42 letter sounds pairs with an action, song and story. Children blend, segment, read and spell daily in small groups or one-to-one, becoming fluent, confident readers and accurate spellers.",
     icon: "🔤",
   },
   {
     title: "Clubs & Field Trips",
     description:
-      "From ICT, Art and Music to Dance and Drama — plus fun and educational trips that enrich learning beyond the classroom.",
+      "Afternoon clubs include football, basketball, swimming, art, music, drama, dance, gardening, coding and debate. Weekly field trips, nature walks and cultural excursions connect lessons to real life. Year 5 and 6 residentials build independence, teamwork and lasting memories.",
     icon: "◈",
   },
   {
     title: "Swimming & Sports",
     description:
-      "Two on-campus pools. All Reception to Year 6 students participate in swim lessons between September and March, led by a swimming coach and lifeguard, supported by Teaching Assistants.",
+      "Two pools plus a splash pool help Pre-Nursery and Nursery build water confidence through play. Reception to Year 6 swim weekly, September to March, with a qualified coach and lifeguard. Sports include football, netball, athletics, cross-country and House competitions every term.",
     icon: "⚽",
   },
   {
     title: "The House System",
     description:
-      "Fostering camaraderie through four Houses: Sunbird House, Baobab House, Eagle House, and Lake House.",
+      "Every learner joins Sunbird, Baobab, Eagle or Lake House. Houses compete in the Fun Run, Sports Day, Swimming Gala, quizzes and academic challenges for the annual championship. House Captains mentor younger peers, fostering camaraderie, leadership and lifelong belonging.",
     icon: "🛡️",
   },
   {
     title: "Learning Support",
     description:
-      "Inclusive education included in school fees, providing extra guidance to ensure no child is left behind.",
+      "Learning Support is included in school fees. Specialist and class teachers identify needs early and design bespoke plans delivered in class, in small groups or one-to-one. Progress is tracked and shared with parents, ensuring every child succeeds at their own pace.",
     icon: "♡",
   },
 ];
@@ -273,7 +339,7 @@ const reasons = [
   {
     title: "Meaningful Learning Experiences",
     description:
-      "We provide an engaging & ever-evolving curriculum that prepares children for life beyond the classroom.",
+      "We provide an engaging and ever-evolving curriculum that prepares children for life beyond the classroom.",
   },
   {
     title: "Beyond Academics",
@@ -343,15 +409,18 @@ const SUBJECTS_RIBBON = [
 ];
 
 /* =========================================================
-   HERO SLIDESHOW — CSS-only, server-safe
+   HERO SLIDESHOW
 ========================================================= */
 
 const FALLBACK_HERO_IMAGES = [
-  "/images/school1.jpg",
+  "/images/eysports.jpg",
   "/images/council.jpg",
   "/images/gardening.jpg",
   "/images/ks1.jpg",
   "/images/ey.jpg",
+  "/images/trips.jpg",
+  "/images/ey-center.JPG",
+  "/images/ict.JPG",
 ];
 
 const HERO_BUTTONS = [
@@ -365,7 +434,7 @@ const QUICK_NAV_CARDS = [
     href: "/about",
     index: "01",
     title: "About Us",
-    desc: "Discover our school, values and story since 1968.",
+    desc: "Discover our school, values and story since 1975.",
     cardClass: "bg-[#252B68] hover:bg-[#1a1d4d]",
     indexClass: "text-[#FFE900]",
     titleClass: "text-white",
@@ -446,7 +515,7 @@ export default async function Home() {
     .filter((img) => img.url);
 
   const schoolLifeImage =
-    resolveImageUrl(featuredGallery?.cover_image) || "/images/team-spirit.JPG";
+    resolveImageUrl(featuredGallery?.cover_image) || "/images/eysports.jpg";
 
   const hasNews =
     Boolean(featuredStory) || Boolean(featuredEvent) || Boolean(featuredGallery);
@@ -455,6 +524,62 @@ export default async function Home() {
 
   return (
     <main className="bg-white text-[#172033]">
+      {/* =========================================================
+          SEO — Structured Data (School + LocalBusiness)
+      ========================================================== */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": ["School", "EducationalOrganization", "LocalBusiness"],
+            "@id": "https://mountviewmw.com/#school",
+            name: "Mount View International Primary School & Early Years Centre",
+            alternateName: [
+              "Mount View International",
+              "Mount View Primary School",
+              "Mount View Early Years Centre",
+            ],
+            url: "https://mountviewmw.com",
+            logo: "https://mountviewmw.com/logo12.png",
+            image: "https://mountviewmw.com/opengraph-image",
+            description:
+              "Cambridge curriculum international primary school and Early Years Centre in Blantyre, Malawi for children aged 20 months to 11 years.",
+            telephone: "+265997355319",
+            email: "info@mountviewmw.com",
+            foundingDate: "1975",
+            address: {
+              "@type": "PostalAddress",
+              addressLocality: "Blantyre",
+              addressRegion: "Southern Region",
+              addressCountry: "MW",
+            },
+            geo: {
+              "@type": "GeoCoordinates",
+              latitude: -15.7960625,
+              longitude: 35.0714375,
+            },
+            areaServed: [
+              { "@type": "City", name: "Blantyre" },
+              { "@type": "Country", name: "Malawi" },
+            ],
+            knowsAbout: [
+              "Cambridge Primary",
+              "Cambridge Early Years",
+              "International education in Malawi",
+              "Primary school education",
+              "Early Years education",
+              "Blantyre schools",
+            ],
+            sameAs: [
+              "https://www.facebook.com/",
+              "https://www.tiktok.com/",
+              "https://wa.me/265997355319",
+            ],
+          }),
+        }}
+      />
+
       {/* =========================================================
           SHARED ANIMATION STYLES
       ========================================================== */}
@@ -540,12 +665,12 @@ export default async function Home() {
 
           <p className="mx-auto max-w-2xl text-lg leading-8 text-blue-50 [text-shadow:0_1px_3px_rgba(0,0,0,0.55)] sm:text-xl">
             For nearly five decades, Mount View has delivered a distinctive
-            British–Cambridge education — nurturing curious minds, shaping
-            character, and preparing children for a lifetime of learning.
+            Cambridge education, nurturing curious minds, shaping character,
+            and preparing children for a lifetime of learning.
           </p>
 
           <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/80 [text-shadow:0_1px_2px_rgba(0,0,0,0.5)]">
-            Growing minds. Inspiring futures. Blantyre, Malawi.
+            Growing minds. Inspiring futures.
           </p>
 
           <div className="mt-10 flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
@@ -576,7 +701,7 @@ export default async function Home() {
           SUBJECTS RIBBON
       ========================================================== */}
       <section
-        aria-label="Subjects taught at Mount View"
+        aria-label="Subjects taught at Mount View International Primary School, Blantyre"
         className="overflow-hidden border-y border-slate-200 bg-white py-4"
       >
         <div className="mv-marquee flex w-max gap-10 whitespace-nowrap">
@@ -593,7 +718,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          INTRODUCTION
+          INTRODUCTION — keyword-rich but natural
       ========================================================== */}
       <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
         <div className="mx-auto grid max-w-[1250px] gap-12 lg:grid-cols-2 lg:items-center">
@@ -611,17 +736,22 @@ export default async function Home() {
 
           <div>
             <p className="text-base leading-8 text-slate-600">
-              We believe that every child has unique talents, abilities and
-              potential. At Mount View, we provide an engaging, supportive and
+              As a leading{" "}
+              <strong className="font-bold text-[#252B68]">
+                international primary school in Blantyre, Malawi
+              </strong>
+              , Mount View believes that every child has unique talents,
+              abilities and potential. We provide an engaging, supportive and
               stimulating environment where learners develop academically,
-              socially and emotionally.
+              socially and emotionally from our Early Years Centre for
+              children aged 20 months through to Year 6 of Cambridge Primary.
             </p>
 
             <Link
               href="/about"
               className="mt-6 inline-flex items-center gap-2 text-sm font-black text-[#252B68] hover:text-[#F58220]"
             >
-              More About Mount View
+              More about our international primary school
               <span aria-hidden>→</span>
             </Link>
           </div>
@@ -651,8 +781,8 @@ export default async function Home() {
                 International Curriculum
               </p>
               <p className="mt-3 text-sm leading-6 text-blue-100">
-                Registered with the University of Cambridge Examinations,
-                offering Checkpoint exams in Year 6.
+                Registered as Cambridge Primary for Checkpoint exams for
+                Year 6.
               </p>
             </div>
 
@@ -671,7 +801,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          OUR STAGES — 2 grouped cards, deep-linked to /academics anchors
+          OUR STAGES
       ========================================================== */}
       <section className="bg-white px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
         <div className="mx-auto max-w-[1250px]">
@@ -688,7 +818,7 @@ export default async function Home() {
 
             <p className="max-w-sm text-sm leading-7 text-slate-500">
               Every learner moves through Cambridge Early Years into Cambridge
-              Primary — building confidence, knowledge and independence along
+              Primary, building confidence, knowledge and independence along
               the way.
             </p>
           </div>
@@ -705,7 +835,7 @@ export default async function Home() {
                   <div className="relative isolate">
                     <ImageWithFallback
                       src={item.image}
-                      alt={item.title}
+                      alt={`${item.title} at Mount View International Primary School in Blantyre`}
                       className="aspect-[16/9] w-full"
                     />
                     <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
@@ -758,8 +888,8 @@ export default async function Home() {
           <div className="relative isolate">
             <div className="overflow-hidden rounded-[2rem] shadow-2xl">
               <ImageWithFallback
-                src="/images/creative-arts.jpg"
-                alt="Learners participating in creative learning activities"
+                src="/images/teachersupport.jpg"
+                alt="Learners participating in creative arts at Mount View international school in Malawi"
                 className="aspect-[4/3] w-full"
               />
             </div>
@@ -848,13 +978,13 @@ export default async function Home() {
               return (
                 <div
                   key={area.title}
-                  className="group rounded-3xl border border-white/10 bg-white/5 p-7 transition duration-300 hover:-translate-y-1 hover:bg-white/10"
+                  className="group flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-7 transition duration-300 hover:-translate-y-1 hover:bg-white/10"
                 >
                   <div
                     className={
                       isOrange
-                        ? "flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F58220] text-xl font-black text-white transition group-hover:bg-white group-hover:text-[#252B68]"
-                        : "flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFE900] text-xl font-black text-[#252B68] transition group-hover:bg-white group-hover:text-[#252B68]"
+                        ? "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#F58220] text-xl font-black text-white transition group-hover:bg-white group-hover:text-[#252B68]"
+                        : "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#FFE900] text-xl font-black text-[#252B68] transition group-hover:bg-white group-hover:text-[#252B68]"
                     }
                   >
                     {area.icon}
@@ -884,7 +1014,7 @@ export default async function Home() {
       </section>
 
       {/* =========================================================
-          LEARNER JOURNEY
+          LEARNER JOURNEY — arrow fix applied
       ========================================================== */}
       <section className="bg-slate-50 px-6 py-20 sm:px-10 lg:px-16 lg:py-28">
         <div className="mx-auto max-w-[1250px]">
@@ -904,32 +1034,33 @@ export default async function Home() {
             </p>
           </div>
 
-          <div className="relative grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          <div className="relative grid items-stretch gap-5 md:grid-cols-2 lg:grid-cols-4">
             {journey.map((item, index) => (
-              <div
-                key={item.step}
-                className="relative overflow-hidden rounded-3xl bg-white pt-1 shadow-sm ring-1 ring-slate-100"
-              >
-                <div className={`h-1.5 w-full ${item.accent}`} />
+              <div key={item.step} className="relative h-full">
+                {/* Card — fills the full height of its grid cell */}
+                <div className="flex h-full flex-col overflow-hidden rounded-3xl bg-white pt-1 shadow-sm ring-1 ring-slate-100">
+                  <div className={`h-1.5 w-full shrink-0 ${item.accent}`} />
 
-                <div className="p-7">
-                  <span className="text-sm font-black text-[#F58220]">
-                    {item.step}
-                  </span>
+                  <div className="flex flex-1 flex-col p-7">
+                    <span className="shrink-0 text-sm font-black text-[#F58220]">
+                      {item.step}
+                    </span>
 
-                  <h3 className="mt-4 text-2xl font-black text-[#252B68]">
-                    {item.title}
-                  </h3>
+                    <h3 className="mt-4 shrink-0 text-2xl font-black text-[#252B68]">
+                      {item.title}
+                    </h3>
 
-                  <p className="mt-4 leading-7 text-slate-600">
-                    {item.description}
-                  </p>
+                    <p className="mt-4 flex-1 leading-7 text-slate-600">
+                      {item.description}
+                    </p>
 
-                  <div className="mt-6 h-1 w-12 rounded-full bg-[#FFE900]" />
+                    <div className="mt-6 h-1 w-12 shrink-0 rounded-full bg-[#FFE900]" />
+                  </div>
                 </div>
 
+                {/* Arrow — on outer wrapper so it isn't clipped */}
                 {index < journey.length - 1 && (
-                  <div className="absolute -right-3 top-1/2 z-10 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-[#F58220] text-xs font-black text-white lg:flex">
+                  <div className="absolute -right-[22px] top-1/2 z-20 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-[#F58220] text-sm font-black text-white shadow-md ring-2 ring-slate-50 md:flex">
                     →
                   </div>
                 )}
@@ -948,7 +1079,7 @@ export default async function Home() {
             <div className="relative min-h-[320px]">
               <ImageWithFallback
                 src={schoolLifeImage}
-                alt="Learners taking part in school activities"
+                alt="Mount View primary school learners taking part in extracurricular activities in Blantyre, Malawi"
                 className="h-full min-h-[320px] w-full"
               />
             </div>
@@ -1041,7 +1172,10 @@ export default async function Home() {
               >
                 <ImageWithFallback
                   src={galleryPreviewImages[0].url}
-                  alt={featuredGallery?.title || "Gallery image"}
+                  alt={
+                    featuredGallery?.title ||
+                    "Campus photo from Mount View International Primary School in Blantyre"
+                  }
                   className="aspect-square h-full w-full"
                 />
                 <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
@@ -1064,7 +1198,7 @@ export default async function Home() {
                 >
                   <ImageWithFallback
                     src={img.url}
-                    alt={`Gallery image ${index + 2}`}
+                    alt={`Photo ${index + 2} from the Mount View school gallery, Blantyre`}
                     className="aspect-square h-full w-full"
                   />
                   <div className="pointer-events-none absolute inset-0 z-10 bg-black/0 transition group-hover:bg-black/30" />
@@ -1111,7 +1245,7 @@ export default async function Home() {
                       resolveImageUrl(featuredStory.image_url) ||
                       "/images/creative-arts.jpg"
                     }
-                    alt={featuredStory.title}
+                    alt={`${featuredStory.title} — Mount View International Primary School news`}
                     className="aspect-[16/10] w-full"
                   />
 
@@ -1140,9 +1274,9 @@ export default async function Home() {
                   <ImageWithFallback
                     src={
                       resolveImageUrl(featuredEvent.image_url) ||
-                      "/images/steam-learning.jpg"
+                      "/images/trips.jpg"
                     }
-                    alt={featuredEvent.title}
+                    alt={`${featuredEvent.title} — upcoming event at Mount View Primary School Blantyre`}
                     className="aspect-[16/10] w-full"
                   />
 
@@ -1176,9 +1310,9 @@ export default async function Home() {
                   <ImageWithFallback
                     src={
                       resolveImageUrl(featuredGallery.cover_image) ||
-                      "/images/school-life.jpg"
+                      "/images/eysports.jpg"
                     }
-                    alt={featuredGallery.title}
+                    alt={`${featuredGallery.title} — Mount View International Primary School gallery`}
                     className="aspect-[16/10] w-full"
                   />
 
@@ -1259,7 +1393,8 @@ export default async function Home() {
               </h2>
 
               <p className="mt-6 max-w-2xl text-lg leading-8 text-blue-100">
-                Take the first step towards an inspiring educational journey.
+                Take the first step towards an inspiring educational journey
+                at one of the best international schools in Blantyre, Malawi.
                 Start your child&apos;s application for admission to Mount View
                 International Primary School &amp; Early Years Centre — our
                 admissions team will guide you from first enquiry to your

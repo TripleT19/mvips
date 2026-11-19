@@ -1,6 +1,5 @@
 import Link from "next/link";
 import ImageWithFallback from "../../components/ImageWithFallback";
-import SpeechVideoPlayer from "../../components/SpeechVideoPlayer";
 
 /* =========================================================
    API / BACKEND HELPERS
@@ -287,7 +286,7 @@ const experienceSlots = [
   {
     key: "ict",
     title: "ICT & Digital Learning",
-    text: "Purposeful use of technology to support creativity, communication, research, and digital confidence. Our ICT Club is a favourite among our afternoon options.",
+    text: "Purposeful use of technology to support creativity, communication, research, and digital confidence.",
     icon: "💻",
     accent: "navy" as const,
     keywords: ["ict", "computer", "digital", "technolog", "laptop", "coding"],
@@ -295,7 +294,7 @@ const experienceSlots = [
   },
   {
     key: "clubs",
-    title: "Afternoon Clubs",
+    title: "Skill Enhancement Clubs",
     text: "Clubs are held on Wednesdays from 11:30 am to 12:20 pm. Options include Football Club, Art Club, Music Club, Sports Club, Swimming Club, Gardening Club, Basketball Club, Drama Club, and Dance Club.",
     icon: "🎯",
     accent: "yellow" as const,
@@ -381,14 +380,10 @@ const leadershipRoles = [
 
 /* =========================================================
    HEAD BOY & HEAD GIRL SPEECHES
-   — YouTube video IDs (unlisted recommended) + full transcript.
-     Only one video can play at a time (see SpeechVideoPlayer).
+   — Written-only. If a speech has no quote AND no transcript,
+     its card is hidden. If neither has content, the whole
+     "A word from our leaders" block is hidden.
 ========================================================= */
-
-type SpeechVideo =
-  | { type: "youtube"; id: string }
-  | { type: "file"; src: string; poster?: string }
-  | null;
 
 type LeadershipSpeech = {
   role: "Head Boy" | "Head Girl";
@@ -397,7 +392,6 @@ type LeadershipSpeech = {
   initials: string;
   image: string | null;
   quote: string;
-  video: SpeechVideo;
   transcript: string[];
 };
 
@@ -410,7 +404,6 @@ const leadershipSpeeches: LeadershipSpeech[] = [
     image: null, // e.g. "/images/head-boy.jpg"
     quote:
       "Being Head Boy has taught me that true leadership is about listening first, then acting with purpose.",
-    video: { type: "youtube", id: "HqAcysEb804" },
     transcript: [
       "When I first joined Mount View, I was shy and unsure of myself. Through the encouragement of my teachers, and the chance to lead in class and on the sports field, I slowly found my voice — and I want every learner to have that same chance.",
       "This year, I want every student to feel that they belong — whether they are brand new to Mount View or have been here since Early Years. I want us to celebrate each other's wins, in the pool, on Sports Day, and in the classroom.",
@@ -425,7 +418,6 @@ const leadershipSpeeches: LeadershipSpeech[] = [
     image: null, // e.g. "/images/head-girl.jpg"
     quote:
       "Leadership is not a title — it is the small choices we make every day to lift others up.",
-    video: { type: "youtube", id: "JO_gLXmUmmM" },
     transcript: [
       "Mount View has given me countless opportunities to grow — from the swimming pool to the drama stage, from the library to the House competitions. Each one has shaped the leader I am today.",
       "As Head Girl, I want every student to know that their voice matters. Whether you are in Year 1 or Year 6, your ideas, your kindness and your courage make our school stronger.",
@@ -434,11 +426,32 @@ const leadershipSpeeches: LeadershipSpeech[] = [
   },
 ];
 
-const dailyLifeInfo = [
+/** A speech only counts as "present" if it has a quote or a transcript. */
+function hasSpeechContent(s: LeadershipSpeech): boolean {
+  return s.quote.trim().length > 0 || s.transcript.some((p) => p.trim().length > 0);
+}
+
+/* =========================================================
+   DAILY LIFE — `image` and `lines` are both optional.
+   - Cards with an image render a photo header.
+   - Cards without one render as clean text cards.
+   - `lines` (if present) renders a structured list instead of
+     the plain paragraph — used for the school schedule.
+========================================================= */
+
+type DailyLifeItem = {
+  title: string;
+  icon: string;
+  image?: string;
+  desc: string;
+  lines?: string[];
+};
+
+const dailyLifeInfo: DailyLifeItem[] = [
   {
     title: "School Clinic",
     icon: "🏥",
-    image: "/images/school-clinic.jpg",
+    image: "/images/clinic.JPG",
     desc: "Our school nurse provides first aid. If a child is ill or injured, they are admitted to the clinic and parents are promptly informed by telephone.",
   },
   {
@@ -450,14 +463,19 @@ const dailyLifeInfo = [
   {
     title: "Library & Reading",
     icon: "📚",
-    image: "/images/library.jpg",
+    image: "/images/library.JPG",
     desc: "Students visit the library weekly to choose a book at their reading level. Reading at home should be a pleasurable experience, not a chore.",
   },
   {
+    /* No image — rendered as a clean text-only card. */
     title: "School Schedule",
     icon: "⏰",
-    image: "/images/school-schedule.jpg",
     desc: "Monday to Thursday: 7:00 am to 12:30 pm. Friday: 7:00 am to 11:30 am. Afternoon clubs are on Wednesdays from 11:30 am to 12:20 pm.",
+    lines: [
+      "Monday – Thursday · 7:00 am – 12:30 pm",
+      "Friday · 7:00 am – 11:30 am",
+      "Skill Enhacenment Clubs (Wednesdays) · 11:30 am – 12:20 pm",
+    ],
   },
 ];
 
@@ -525,11 +543,11 @@ export default async function SchoolLifePage() {
     );
   }
 
-  const teamSpiritImage = findImage(
-    pool,
-    ["leadership", "prefect", "head boy", "head girl", "council", "captain"],
-    "/images/council.jpg"
-  );
+  /* Banner image under the Head Boy / Head Girl speeches — fixed. */
+  const teamSpiritImage = "/images/council.jpg";
+
+  /* ---- Speeches that actually have something to show ---- */
+  const activeSpeeches = leadershipSpeeches.filter(hasSpeechContent);
 
   /* ---- Gallery preview — deduplicated ---- */
   const galleryPreviewImages: string[] = [];
@@ -576,24 +594,12 @@ export default async function SchoolLifePage() {
         .mv-pop{animation:mv-pop 3.5s ease-in-out infinite}
         .mv-marquee{animation:mv-marquee 35s linear infinite}
 
-        /* Native <details> — hide default marker, rotate chevron on open */
         details > summary { list-style: none; }
         details > summary::-webkit-details-marker { display: none; }
         details[open] .speech-toggle-icon { transform: rotate(180deg); }
         details[open] .speech-label-closed { display: none; }
         details[open] .speech-label-open { display: inline; }
         .speech-label-open { display: none; }
-
-        /* Fill the wrapper: the client component mounts a div/iframe here */
-        .speech-video-player,
-        .speech-video-player > div,
-        .speech-video-player iframe {
-          position: absolute !important;
-          inset: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-          border: 0 !important;
-        }
 
         @media (prefers-reduced-motion: reduce){
           .mv-float,.mv-float-alt,.mv-blob,.mv-pop,.mv-marquee{animation:none}
@@ -837,7 +843,6 @@ export default async function SchoolLifePage() {
         <span className="mv-float-alt pointer-events-none absolute right-[6%] bottom-16 text-5xl opacity-25">🎉</span>
 
         <div className="relative z-10 mx-auto max-w-7xl">
-          {/* Centered header */}
           <div className="mx-auto max-w-3xl text-center">
             <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
@@ -862,10 +867,8 @@ export default async function SchoolLifePage() {
 
           {showRankings ? (
             <>
-              {/* ---- CHAMPION SHOWCASE — points LEFT, featured image RIGHT ---- */}
               <div className="mt-14 overflow-hidden rounded-[2rem] border-2 border-[#FFE900]/50 bg-[#1c2260] shadow-2xl">
                 <div className="grid lg:grid-cols-[1fr_1.1fr]">
-                  {/* LEFT: points + name */}
                   <div className="relative flex flex-col justify-center p-8 sm:p-10 lg:p-12">
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#FFE900]/12 via-transparent to-[#F58220]/10" />
                     <div className="relative">
@@ -893,7 +896,6 @@ export default async function SchoolLifePage() {
                     </div>
                   </div>
 
-                  {/* RIGHT: featured image (or logo fallback, or colour block) */}
                   <div className="relative min-h-[280px] lg:min-h-full">
                     {displayHouses[0].featured_image_url ? (
                       <ImageWithFallback
@@ -933,7 +935,6 @@ export default async function SchoolLifePage() {
                 </div>
               </div>
 
-              {/* ---- LEADERBOARD — points LEFT, house logo RIGHT ---- */}
               <div className="mt-6 grid gap-3 lg:grid-cols-2">
                 {displayHouses.map((house) => {
                   const isFirst = house.position === 1;
@@ -948,7 +949,6 @@ export default async function SchoolLifePage() {
                           : "border-white/10 bg-white/5 hover:bg-white/10"
                       }`}
                     >
-                      {/* LEFT: position badge + points */}
                       <div className="flex shrink-0 items-center gap-3">
                         <div
                           className={`flex h-11 w-11 items-center justify-center rounded-xl text-xs font-black shadow-lg sm:h-12 sm:w-12 sm:text-sm ${
@@ -975,7 +975,6 @@ export default async function SchoolLifePage() {
                         </div>
                       </div>
 
-                      {/* CENTER: name + code */}
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-base font-black text-white sm:text-lg">
                           {house.name}
@@ -987,7 +986,6 @@ export default async function SchoolLifePage() {
                         )}
                       </div>
 
-                      {/* RIGHT: house logo */}
                       <div
                         className="h-14 w-14 shrink-0 overflow-hidden rounded-full sm:h-16 sm:w-16"
                         style={{ boxShadow: `0 0 0 2px ${house.colour}` }}
@@ -1016,7 +1014,6 @@ export default async function SchoolLifePage() {
               </div>
             </>
           ) : (
-            /* ---- Pre-season: no points yet ---- */
             <div className="mt-14 space-y-8">
               <div className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {displayHouses.map((house) => {
@@ -1058,7 +1055,6 @@ export default async function SchoolLifePage() {
             </div>
           )}
 
-          {/* CTA */}
           <div className="mt-14 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/admissions"
@@ -1116,153 +1112,142 @@ export default async function SchoolLifePage() {
             ))}
           </div>
 
-          {/* ---- Head Boy & Head Girl Speeches (with video + transcript) ---- */}
-          <div className="mt-16">
-            <div className="mx-auto max-w-3xl text-center">
-              <p className="inline-flex items-center gap-2 rounded-full bg-[#252B68]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#252B68]">
-                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-                A word from our leaders
-              </p>
-              <h3 className="mt-4 text-2xl font-black text-[#252B68] sm:text-3xl">
-                Head Boy &amp; Head Girl Speeches
-              </h3>
-              <p className="mt-4 leading-8 text-slate-600">
-                Watch their speeches or read the full transcripts below. Only
-                one video plays at a time — starting one will pause the other.
-              </p>
-            </div>
+          {/* ---- Head Boy & Head Girl — written speeches only ---- */}
+          {activeSpeeches.length > 0 && (
+            <div className="mt-16">
+              <div className="mx-auto max-w-3xl text-center">
+                <p className="inline-flex items-center gap-2 rounded-full bg-[#252B68]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#252B68]">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+                  A word from our leaders
+                </p>
+                <h3 className="mt-4 text-2xl font-black text-[#252B68] sm:text-3xl">
+                  Head Boy &amp; Head Girl Speeches
+                </h3>
+                <p className="mt-4 leading-8 text-slate-600">
+                  Read the full speeches written by our Head Boy and Head Girl.
+                </p>
+              </div>
 
-            <div className="mt-10 grid gap-6 lg:grid-cols-2">
-              {leadershipSpeeches.map((speech) => {
-                const accent =
-                  speech.role === "Head Boy" ? "#F58220" : "#252B68";
+              <div
+                className={`mt-10 grid gap-6 ${
+                  activeSpeeches.length === 1
+                    ? "mx-auto max-w-2xl"
+                    : "lg:grid-cols-2"
+                }`}
+              >
+                {activeSpeeches.map((speech) => {
+                  const accent =
+                    speech.role === "Head Boy" ? "#F58220" : "#252B68";
 
-                const hasVideo =
-                  speech.video !== null &&
-                  (speech.video.type === "file" ||
-                    (speech.video.type === "youtube" &&
-                      speech.video.id.trim().length > 0));
+                  return (
+                    <article
+                      key={speech.role}
+                      className="group relative overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
+                    >
+                      <div
+                        className="h-2 w-full"
+                        style={{ backgroundColor: accent }}
+                      />
 
-                return (
-                  <article
-                    key={speech.role}
-                    className="group relative overflow-hidden rounded-[2rem] bg-white shadow-xl ring-1 ring-slate-100 transition duration-300 hover:-translate-y-1 hover:shadow-2xl"
-                  >
-                    {/* Top accent bar */}
-                    <div
-                      className="h-2 w-full"
-                      style={{ backgroundColor: accent }}
-                    />
-
-                    <div className="p-5 sm:p-7">
-                      {/* ---- Video (client component — coordinates pause/play) ---- */}
-                      {hasVideo && (
-                        <div className="relative mb-6 aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-lg ring-1 ring-slate-200">
-                          <SpeechVideoPlayer
-                            video={speech.video}
-                            title={`${speech.role} speech`}
-                          />
-                        </div>
-                      )}
-
-                      {/* Quote mark */}
-                      <span
-                        className="block text-5xl font-black leading-none"
-                        style={{ color: `${accent}33` }}
-                        aria-hidden="true"
-                      >
-                        &ldquo;
-                      </span>
-
-                      {/* Key quote */}
-                      <p className="text-lg font-bold italic leading-relaxed text-[#252B68] sm:text-xl">
-                        {speech.quote}
-                      </p>
-
-                      {/* Author */}
-                      <div className="mt-6 flex items-center gap-4 border-t border-slate-100 pt-5">
-                        <div
-                          className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full font-black text-white shadow-lg"
-                          style={{ backgroundColor: accent }}
+                      <div className="p-5 sm:p-7">
+                        <span
+                          className="block text-5xl font-black leading-none"
+                          style={{ color: `${accent}33` }}
+                          aria-hidden="true"
                         >
-                          {speech.image ? (
-                            <ImageWithFallback
-                              src={speech.image}
-                              alt={speech.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-sm tracking-wider">
-                              {speech.initials}
-                            </span>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-lg font-black text-[#252B68]">
-                            {speech.name}
-                          </p>
-                          <p
-                            className="text-xs font-bold uppercase tracking-widest"
-                            style={{ color: accent }}
-                          >
-                            {speech.role} · {speech.grade}
-                          </p>
-                        </div>
-                      </div>
+                          &ldquo;
+                        </span>
 
-                      {/* ---- Transcript toggle ---- */}
-                      {speech.transcript.length > 0 && (
-                        <details className="mt-6 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70">
-                          <summary
-                            className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-black text-[#252B68] transition hover:bg-slate-100"
-                            aria-label={`Toggle ${speech.role} transcript`}
+                        {speech.quote.trim().length > 0 && (
+                          <p className="text-lg font-bold italic leading-relaxed text-[#252B68] sm:text-xl">
+                            {speech.quote}
+                          </p>
+                        )}
+
+                        <div className="mt-6 flex items-center gap-4 border-t border-slate-100 pt-5">
+                          <div
+                            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full font-black text-white shadow-lg"
+                            style={{ backgroundColor: accent }}
                           >
-                            <span className="flex items-center gap-2">
-                              <span aria-hidden="true">📄</span>
-                              <span className="speech-label-closed">
-                                Read the full transcript
-                              </span>
-                              <span className="speech-label-open">
-                                Hide transcript
-                              </span>
-                            </span>
-                            <svg
-                              className="speech-toggle-icon h-4 w-4 shrink-0 text-[#252B68] transition-transform duration-200"
-                              viewBox="0 0 20 20"
-                              fill="currentColor"
-                              aria-hidden="true"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
-                                clipRule="evenodd"
+                            {speech.image ? (
+                              <ImageWithFallback
+                                src={speech.image}
+                                alt={speech.name}
+                                className="h-full w-full object-cover"
                               />
-                            </svg>
-                          </summary>
-
-                          <div className="space-y-3 border-t border-slate-200/70 px-4 py-4">
-                            {speech.transcript.map((para, i) => (
-                              <p
-                                key={i}
-                                className="text-sm leading-7 text-slate-600"
-                              >
-                                {para}
-                              </p>
-                            ))}
+                            ) : (
+                              <span className="text-sm tracking-wider">
+                                {speech.initials}
+                              </span>
+                            )}
                           </div>
-                        </details>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
+                          <div>
+                            <p className="text-lg font-black text-[#252B68]">
+                              {speech.name}
+                            </p>
+                            <p
+                              className="text-xs font-bold uppercase tracking-widest"
+                              style={{ color: accent }}
+                            >
+                              {speech.role} · {speech.grade}
+                            </p>
+                          </div>
+                        </div>
 
+                        {speech.transcript.length > 0 && (
+                          <details className="mt-6 rounded-2xl bg-slate-50 ring-1 ring-slate-200/70">
+                            <summary
+                              className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-sm font-black text-[#252B68] transition hover:bg-slate-100"
+                              aria-label={`Toggle ${speech.role} speech`}
+                            >
+                              <span className="flex items-center gap-2">
+                                <span aria-hidden="true">📄</span>
+                                <span className="speech-label-closed">
+                                  Read the full speech
+                                </span>
+                                <span className="speech-label-open">
+                                  Hide speech
+                                </span>
+                              </span>
+                              <svg
+                                className="speech-toggle-icon h-4 w-4 shrink-0 text-[#252B68] transition-transform duration-200"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M5.23 7.21a.75.75 0 011.06.02L10 11.06l3.71-3.83a.75.75 0 111.08 1.04l-4.25 4.39a.75.75 0 01-1.08 0L5.21 8.27a.75.75 0 01.02-1.06z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </summary>
+
+                            <div className="space-y-3 border-t border-slate-200/70 px-4 py-4">
+                              {speech.transcript.map((para, i) => (
+                                <p
+                                  key={i}
+                                  className="text-sm leading-7 text-slate-600"
+                                >
+                                  {para}
+                                </p>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ---- Council banner — always council.jpg ---- */}
           <div className="mt-12 overflow-hidden rounded-[2rem] shadow-xl ring-1 ring-slate-100">
             <div className="relative aspect-[16/6] w-full">
               <ImageWithFallback
-                src={teamSpiritImage.url}
+                src={teamSpiritImage}
                 alt="Student leadership at Mount View"
                 className="h-full w-full object-cover"
               />
@@ -1300,33 +1285,72 @@ export default async function SchoolLifePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            {dailyLifeInfo.map((info) => (
-              <article
-                key={info.title}
-                className="group overflow-hidden rounded-3xl bg-white shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
-              >
-                <div className="relative aspect-[16/9] overflow-hidden">
-                  <ImageWithFallback
-                    src={info.image}
-                    alt={info.title}
-                    className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
-                  />
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
-                  <div className="absolute left-4 top-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/95 text-2xl shadow-lg backdrop-blur transition group-hover:scale-110">
-                    {info.icon}
-                  </div>
-                </div>
+            {dailyLifeInfo.map((info) => {
+              const hasImage = Boolean(info.image);
+              return (
+                <article
+                  key={info.title}
+                  className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-lg transition duration-300 hover:-translate-y-2 hover:shadow-2xl"
+                >
+                  {hasImage && (
+                    <div className="relative aspect-[16/9] overflow-hidden">
+                      <ImageWithFallback
+                        src={info.image as string}
+                        alt={info.title}
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent" />
+                      <div className="absolute left-4 top-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white/95 text-2xl shadow-lg backdrop-blur transition group-hover:scale-110">
+                        {info.icon}
+                      </div>
+                    </div>
+                  )}
 
-                <div className="p-6 sm:p-7">
-                  <h3 className="text-xl font-black text-[#252B68]">
-                    {info.title}
-                  </h3>
-                  <p className="mt-3 leading-7 text-slate-600">
-                    {info.desc}
-                  </p>
-                </div>
-              </article>
-            ))}
+                  {/* No-image cards vertically centre their content so the
+                      card still looks intentional next to photo cards. */}
+                  <div
+                    className={`p-6 sm:p-7 ${
+                      hasImage ? "" : "flex flex-1 flex-col justify-center"
+                    }`}
+                  >
+                    {hasImage ? (
+                      <h3 className="text-xl font-black text-[#252B68]">
+                        {info.title}
+                      </h3>
+                    ) : (
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#FFE900] text-2xl shadow-sm">
+                          {info.icon}
+                        </div>
+                        <h3 className="text-xl font-black text-[#252B68]">
+                          {info.title}
+                        </h3>
+                      </div>
+                    )}
+
+                    {info.lines ? (
+                      <ul className="mt-3 space-y-2.5">
+                        {info.lines.map((line) => (
+                          <li
+                            key={line}
+                            className="flex items-start gap-2.5 text-slate-600"
+                          >
+                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#F58220]" />
+                            <span className="font-medium leading-7">
+                              {line}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-3 leading-7 text-slate-600">
+                        {info.desc}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -1380,7 +1404,6 @@ export default async function SchoolLifePage() {
 
       {/* =====================================================
           FOR FAMILIES — orange band
-          (distinct from the navy newsletter subscription below)
       ====================================================== */}
       <section className="relative isolate overflow-hidden bg-[#F58220] px-4 py-20 sm:px-6 lg:px-8 lg:py-24">
         <div className="pointer-events-none absolute -left-32 -top-32 z-0 h-96 w-96 rounded-full bg-white/15 blur-3xl" />

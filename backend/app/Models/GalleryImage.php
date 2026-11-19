@@ -2,22 +2,19 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
 class GalleryImage extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
         'gallery_id',
         'image_path',
         'sort_order',
     ];
 
-    protected $appends = [
-        'image_url',
+    protected $casts = [
+        'sort_order' => 'integer',
     ];
 
     public function gallery()

@@ -22,6 +22,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  GripVertical,
 } from "lucide-react";
 
 const API_URL =
@@ -78,10 +81,7 @@ const CLASS_OPTIONS = [
 function getImageUrl(url: string | null): string | null {
   if (!url) return null;
 
-  if (
-    url.startsWith("http://") ||
-    url.startsWith("https://")
-  ) {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
   }
 
@@ -98,6 +98,14 @@ function formatDate(date: string | null) {
   });
 }
 
+/** Immutably move an item from `from` to `to` in an array. */
+function reorderArray<T>(arr: T[], from: number, to: number): T[] {
+  const next = [...arr];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
+
 export default function GalleryPage() {
   /* ---------- Listing state ---------- */
   const [galleries, setGalleries] = useState<Gallery[]>([]);
@@ -111,11 +119,18 @@ export default function GalleryPage() {
 
   /* ---------- Create / Edit modal ---------- */
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingGallery, setEditingGallery] =
-    useState<Gallery | null>(null);
+  const [editingGallery, setEditingGallery] = useState<Gallery | null>(null);
   const [modalError, setModalError] = useState("");
   const [modalMessage, setModalMessage] = useState("");
   const [saving, setSaving] = useState(false);
+
+  /* ---------- Image ordering ---------- */
+  const [modalImages, setModalImages] = useState<GalleryImage[]>([]);
+  const [reordering, setReordering] = useState(false);
+  const reorderingRef = useRef(false);
+  const [dragSourceIndex, setDragSourceIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dragOverNewIndex, setDragOverNewIndex] = useState<number | null>(null);
 
   const [form, setForm] = useState<FormDataType>({
     title: "",
@@ -132,12 +147,10 @@ export default function GalleryPage() {
 
   /* ---------- View modal ---------- */
   const [viewOpen, setViewOpen] = useState(false);
-  const [viewingGallery, setViewingGallery] =
-    useState<Gallery | null>(null);
+  const [viewingGallery, setViewingGallery] = useState<Gallery | null>(null);
 
   /* ---------- Confirmation modal ---------- */
-  const [confirmState, setConfirmState] =
-    useState<ConfirmState | null>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [confirmError, setConfirmError] = useState("");
   const [confirmProcessing, setConfirmProcessing] = useState(false);
 
@@ -191,17 +204,13 @@ export default function GalleryPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          data.message || "Unable to load gallery."
-        );
+        throw new Error(data.message || "Unable to load gallery.");
       }
 
       setGalleries(data.data?.data || []);
     } catch (err) {
       setListError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load gallery."
+        err instanceof Error ? err.message : "Unable to load gallery."
       );
     } finally {
       setLoading(false);
@@ -241,6 +250,7 @@ export default function GalleryPage() {
 
   function openCreate() {
     setEditingGallery(null);
+    setModalImages([]);
     resetForm();
     setModalError("");
     setModalMessage("");
@@ -249,6 +259,7 @@ export default function GalleryPage() {
 
   function openEdit(gallery: Gallery) {
     setEditingGallery(gallery);
+    setModalImages([...gallery.images]);
     setForm({
       title: gallery.title,
       description: gallery.description || "",
@@ -270,13 +281,17 @@ export default function GalleryPage() {
     if (saving) return;
     setModalOpen(false);
     setEditingGallery(null);
+    setModalImages([]);
     setModalError("");
     setModalMessage("");
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
+    setDragOverNewIndex(null);
     resetForm();
   }
 
   /* ============================================================
-   * IMAGE SELECTION
+   * IMAGE SELECTION (NEW FILES)
    * ============================================================ */
 
   function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
@@ -288,12 +303,9 @@ export default function GalleryPage() {
 
     for (const file of files) {
       if (
-        ![
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/webp",
-        ].includes(file.type)
+        !["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(
+          file.type
+        )
       ) {
         rejected.push(`${file.name} is not a supported image type.`);
         continue;
@@ -315,9 +327,7 @@ export default function GalleryPage() {
 
     const combined = [...newImages, ...validFiles];
     setNewImages(combined);
-    setNewImagePreviews(
-      combined.map((file) => URL.createObjectURL(file))
-    );
+    setNewImagePreviews(combined.map((file) => URL.createObjectURL(file)));
     setModalError(rejected.length ? rejected.join(" ") : "");
     event.target.value = "";
   }
@@ -329,8 +339,153 @@ export default function GalleryPage() {
     );
   }
 
+  function moveNewImage(from: number, to: number) {
+    if (from === to || to < 0 || to >= newImages.length) return;
+    setNewImages((current) => reorderArray(current, from, to));
+    setNewImagePreviews((current) => reorderArray(current, from, to));
+  }
+
+  /* ---------- New-image drag handlers ---------- */
+
+  function handleNewDragStart(e: React.DragEvent, index: number) {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  }
+
+  function handleNewDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverNewIndex(index);
+  }
+
+  function handleNewDrop(e: React.DragEvent, targetIndex: number) {
+    e.preventDefault();
+    setDragOverNewIndex(null);
+    const fromIndex = parseInt(e.dataTransfer.getData("text/plain"), 10);
+    if (isNaN(fromIndex) || fromIndex === targetIndex) return;
+    moveNewImage(fromIndex, targetIndex);
+  }
+
   /* ============================================================
-   * SAVE GALLERY
+   * EXISTING IMAGE REORDERING
+   * ============================================================ */
+
+  async function saveImageOrder(
+    newOrder: GalleryImage[],
+    previousOrder: GalleryImage[]
+  ) {
+    const token = getToken();
+    if (!token) {
+      window.location.href = "/admin/login";
+      return;
+    }
+
+    reorderingRef.current = true;
+    setReordering(true);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/admin/gallery-images/reorder`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            images: newOrder.map((img, index) => ({
+              id: img.id,
+              sort_order: index,
+            })),
+          }),
+        }
+      );
+
+      if (response.status === 401) {
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_user");
+        window.location.href = "/admin/login";
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Unable to save image order.");
+      }
+
+      // Reflect the new order + new cover image in the lists
+      if (editingGallery) {
+        const updated: Gallery = {
+          ...editingGallery,
+          images: newOrder,
+          image_count: newOrder.length,
+          cover_image: newOrder[0]?.image_url || null,
+        };
+        setEditingGallery(updated);
+        setGalleries((current) =>
+          current.map((g) => (g.id === updated.id ? updated : g))
+        );
+      }
+    } catch (err) {
+      // Roll back the UI so it stays consistent with the server
+      setModalImages(previousOrder);
+      setModalError(
+        err instanceof Error ? err.message : "Unable to save image order."
+      );
+    } finally {
+      reorderingRef.current = false;
+      setReordering(false);
+    }
+  }
+
+  function moveExistingImage(from: number, to: number) {
+    if (reorderingRef.current) return;
+    if (from === to) return;
+    if (to < 0 || to >= modalImages.length) return;
+
+    const previous = modalImages;
+    const newOrder = reorderArray(modalImages, from, to);
+    setModalImages(newOrder);
+    saveImageOrder(newOrder, previous);
+  }
+
+  function setAsCover(index: number) {
+    if (index === 0) return;
+    moveExistingImage(index, 0);
+  }
+
+  /* ---------- Existing-image drag handlers ---------- */
+
+  function handleExistingDragStart(e: React.DragEvent, index: number) {
+    setDragSourceIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  }
+
+  function handleExistingDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverIndex(index);
+  }
+
+  function handleExistingDrop(e: React.DragEvent, targetIndex: number) {
+    e.preventDefault();
+    setDragOverIndex(null);
+    const fromIndex =
+      dragSourceIndex ?? parseInt(e.dataTransfer.getData("text/plain"), 10);
+    setDragSourceIndex(null);
+    if (isNaN(fromIndex) || fromIndex === targetIndex) return;
+    moveExistingImage(fromIndex, targetIndex);
+  }
+
+  function handleExistingDragEnd() {
+    setDragSourceIndex(null);
+    setDragOverIndex(null);
+  }
+
+  /* ============================================================
+   * SAVE GALLERY (fields + new images)
    * ============================================================ */
 
   async function saveGallery() {
@@ -376,6 +531,7 @@ export default function GalleryPage() {
         data.append("_method", "PUT");
       }
 
+      // Preserve the user's chosen order for new images
       newImages.forEach((file) => data.append("images[]", file));
 
       const url = editingGallery
@@ -409,6 +565,7 @@ export default function GalleryPage() {
 
       setModalOpen(false);
       setEditingGallery(null);
+      setModalImages([]);
       resetForm();
       setListError("");
       setListMessage(successMsg);
@@ -472,9 +629,7 @@ export default function GalleryPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.message || "Unable to delete gallery."
-          );
+          throw new Error(data.message || "Unable to delete gallery.");
         }
 
         setGalleries((current) =>
@@ -500,32 +655,28 @@ export default function GalleryPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data.message || "Unable to remove image."
-          );
+          throw new Error(data.message || "Unable to remove image.");
         }
 
+        const remaining = modalImages.filter(
+          (item) => item.id !== confirmState.image.id
+        );
+        setModalImages(remaining);
+
         if (editingGallery) {
-          const updatedImages = editingGallery.images.filter(
-            (item) => item.id !== confirmState.image.id
-          );
-
-          const updatedGallery: Gallery = {
+          const updated: Gallery = {
             ...editingGallery,
-            images: updatedImages,
-            image_count: updatedImages.length,
-            cover_image: updatedImages[0]?.image_url || null,
+            images: remaining,
+            image_count: remaining.length,
+            cover_image: remaining[0]?.image_url || null,
           };
-
-          setEditingGallery(updatedGallery);
-
+          setEditingGallery(updated);
           if (viewingGallery?.id === editingGallery.id) {
-            setViewingGallery(updatedGallery);
+            setViewingGallery(updated);
           }
-
           setGalleries((current) =>
             current.map((item) =>
-              item.id === updatedGallery.id ? updatedGallery : item
+              item.id === updated.id ? updated : item
             )
           );
         }
@@ -1005,75 +1156,232 @@ export default function GalleryPage() {
                     className="hidden"
                   />
 
-                  {editingGallery &&
-                    editingGallery.images.length > 0 && (
-                      <div className="mt-4">
-                        <div className="mb-2 flex items-center justify-between">
+                  {/* ---------- EXISTING IMAGES (reorderable) ---------- */}
+                  {editingGallery && modalImages.length > 0 && (
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div>
                           <p className="text-xs font-semibold text-slate-700">
                             Current Images
                           </p>
+                          <p className="mt-0.5 text-[10px] text-slate-400">
+                            Drag to reorder · use ← → for precise moves
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {reordering && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                              <Loader2 size={10} className="animate-spin" />
+                              Saving order…
+                            </span>
+                          )}
                           <span className="text-[11px] text-slate-400">
-                            {editingGallery.images.length} images
+                            {modalImages.length} images
                           </span>
                         </div>
+                      </div>
 
-                        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                          {editingGallery.images.map((image, index) => (
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                        {modalImages.map((image, index) => {
+                          const isFirst = index === 0;
+                          const isLast = index === modalImages.length - 1;
+                          const isDragSource = dragSourceIndex === index;
+                          const isDragOver =
+                            dragOverIndex === index &&
+                            dragSourceIndex !== index;
+
+                          return (
                             <div
                               key={image.id}
-                              className="group relative aspect-square overflow-hidden rounded-lg bg-slate-100"
+                              draggable={!reordering}
+                              onDragStart={(e) =>
+                                handleExistingDragStart(e, index)
+                              }
+                              onDragOver={(e) =>
+                                handleExistingDragOver(e, index)
+                              }
+                              onDrop={(e) =>
+                                handleExistingDrop(e, index)
+                              }
+                              onDragEnd={handleExistingDragEnd}
+                              onDragEnter={() => setDragOverIndex(index)}
+                              className={`group relative aspect-square cursor-grab overflow-hidden rounded-lg bg-slate-100 transition ${
+                                isDragSource
+                                  ? "opacity-40"
+                                  : ""
+                              } ${
+                                isDragOver
+                                  ? "ring-2 ring-[#252B68] ring-offset-1"
+                                  : ""
+                              } ${
+                                reordering ? "pointer-events-none opacity-60" : ""
+                              }`}
                             >
                               <img
                                 src={getImageUrl(image.image_url) || ""}
                                 alt={`Gallery image ${index + 1}`}
-                                className="h-full w-full object-cover"
+                                className="pointer-events-none h-full w-full object-cover"
+                                draggable={false}
                               />
+
+                              {/* Top-left: Cover badge OR drag handle */}
+                              {isFirst ? (
+                                <span className="absolute left-1 top-1 z-10 inline-flex items-center gap-0.5 rounded bg-[#FFE900] px-1.5 py-0.5 text-[9px] font-bold text-[#172033] shadow-sm">
+                                  <Star size={9} fill="currentColor" />
+                                  Cover
+                                </span>
+                              ) : (
+                                <span className="absolute left-1 top-1 z-10 rounded bg-black/45 p-0.5 text-white">
+                                  <GripVertical size={11} />
+                                </span>
+                              )}
+
+                              {/* Top-right: Delete */}
                               <button
                                 type="button"
-                                onClick={() => openImageRemoveConfirm(image)}
-                                className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white opacity-90 shadow-sm transition hover:bg-red-700"
+                                onClick={() =>
+                                  openImageRemoveConfirm(image)
+                                }
+                                disabled={reordering}
+                                className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700 disabled:opacity-40"
                                 title="Remove image"
                               >
-                                <X size={14} />
+                                <X size={12} />
                               </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
 
+                              {/* Bottom overlay: reorder controls */}
+                              <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-1 pb-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveExistingImage(index, index - 1)
+                                  }
+                                  disabled={isFirst || reordering}
+                                  className="flex h-6 w-6 items-center justify-center rounded bg-white/25 text-white backdrop-blur-sm transition hover:bg-white/40 disabled:opacity-30"
+                                  title="Move left"
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveExistingImage(index, index + 1)
+                                  }
+                                  disabled={isLast || reordering}
+                                  className="flex h-6 w-6 items-center justify-center rounded bg-white/25 text-white backdrop-blur-sm transition hover:bg-white/40 disabled:opacity-30"
+                                  title="Move right"
+                                >
+                                  <ChevronRight size={12} />
+                                </button>
+                                {!isFirst && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setAsCover(index)}
+                                    disabled={reordering}
+                                    className="flex h-6 items-center justify-center rounded bg-white/25 px-1.5 text-[9px] font-semibold text-white backdrop-blur-sm transition hover:bg-white/40 disabled:opacity-30"
+                                    title="Set as cover image"
+                                  >
+                                    Cover
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ---------- NEW IMAGES (reorderable before upload) ---------- */}
                   {newImagePreviews.length > 0 && (
                     <div className="mt-4">
                       <div className="mb-2 flex items-center justify-between">
-                        <p className="text-xs font-semibold text-slate-700">
-                          New Images
-                        </p>
+                        <div>
+                          <p className="text-xs font-semibold text-slate-700">
+                            New Images
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-slate-400">
+                            Will be appended after existing images
+                          </p>
+                        </div>
                         <span className="text-[11px] text-[#252B68]">
                           {newImages.length} ready
                         </span>
                       </div>
 
                       <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-                        {newImagePreviews.map((preview, index) => (
-                          <div
-                            key={`${preview}-${index}`}
-                            className="group relative aspect-square overflow-hidden rounded-lg bg-slate-100"
-                          >
-                            <img
-                              src={preview}
-                              alt={`New image ${index + 1}`}
-                              className="h-full w-full object-cover"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeNewImage(index)}
-                              className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700"
-                              title="Remove"
+                        {newImagePreviews.map((preview, index) => {
+                          const isFirst = index === 0;
+                          const isLast =
+                            index === newImagePreviews.length - 1;
+                          const isDragOver = dragOverNewIndex === index;
+
+                          return (
+                            <div
+                              key={`${preview}-${index}`}
+                              draggable
+                              onDragStart={(e) =>
+                                handleNewDragStart(e, index)
+                              }
+                              onDragOver={(e) =>
+                                handleNewDragOver(e, index)
+                              }
+                              onDrop={(e) => handleNewDrop(e, index)}
+                              onDragEnd={() =>
+                                setDragOverNewIndex(null)
+                              }
+                              onDragEnter={() =>
+                                setDragOverNewIndex(index)
+                              }
+                              className={`group relative aspect-square cursor-grab overflow-hidden rounded-lg bg-slate-100 transition ${
+                                isDragOver
+                                  ? "ring-2 ring-[#252B68] ring-offset-1"
+                                  : ""
+                              }`}
                             >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
+                              <img
+                                src={preview}
+                                alt={`New image ${index + 1}`}
+                                className="pointer-events-none h-full w-full object-cover"
+                                draggable={false}
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => removeNewImage(index)}
+                                className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition hover:bg-red-700"
+                                title="Remove"
+                              >
+                                <X size={12} />
+                              </button>
+
+                              <div className="absolute inset-x-0 bottom-0 z-10 flex items-center justify-center gap-1 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-1 pb-1 pt-6">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveNewImage(index, index - 1)
+                                  }
+                                  disabled={isFirst}
+                                  className="flex h-6 w-6 items-center justify-center rounded bg-white/25 text-white backdrop-blur-sm transition hover:bg-white/40 disabled:opacity-30"
+                                  title="Move left"
+                                >
+                                  <ChevronLeft size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    moveNewImage(index, index + 1)
+                                  }
+                                  disabled={isLast}
+                                  className="flex h-6 w-6 items-center justify-center rounded bg-white/25 text-white backdrop-blur-sm transition hover:bg-white/40 disabled:opacity-30"
+                                  title="Move right"
+                                >
+                                  <ChevronRight size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
@@ -1092,10 +1400,10 @@ export default function GalleryPage() {
               </button>
               <button
                 onClick={saveGallery}
-                disabled={saving}
+                disabled={saving || reordering}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#252B68] px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#1d2257] disabled:opacity-60"
               >
-                {saving && (
+                {(saving || reordering) && (
                   <Loader2 size={15} className="animate-spin" />
                 )}
                 {saving
@@ -1202,7 +1510,7 @@ export default function GalleryPage() {
       )}
 
       {/* ================================================================
-       * CONFIRM MODAL — replaces window.confirm()
+       * CONFIRM MODAL
        * ================================================================ */}
       {confirmState && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">

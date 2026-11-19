@@ -1,5 +1,56 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ImageWithFallback from "../../components/ImageWithFallback";
+
+/* ------------------------------------------------------------------ */
+/*  SEO                                                                */
+/* ------------------------------------------------------------------ */
+
+export const metadata: Metadata = {
+  title:
+    "Academics — Cambridge Curriculum from Early Years to Year 6 | Mount View",
+  description:
+    "Explore Mount View's Cambridge curriculum in Blantyre, Malawi: Early Years (20 months – 5 years), Cambridge Primary (Years 1–6), core subjects, specialist teaching and the pathway to Central High School.",
+  keywords: [
+    "Cambridge Primary Blantyre",
+    "Cambridge curriculum Malawi",
+    "Cambridge Early Years Blantyre",
+    "Cambridge Checkpoint Malawi",
+    "international primary school Blantyre",
+    "best international school Blantyre",
+    "primary school curriculum Malawi",
+    "Year 1 Cambridge Malawi",
+    "Year 2 Cambridge Malawi",
+    "Year 3 Year 4 Year 5 Year 6 Cambridge Malawi",
+    "Jolly Phonics Malawi",
+    "primary school subjects Blantyre",
+    "English Mathematics Science Malawi school",
+    "Global Perspectives ICT Art Music PE Swimming Malawi",
+    "Cambridge Primary subjects",
+    "Mount View academics",
+    "Mount View International Primary School curriculum",
+    "early years Blantyre",
+    "pre-nursery nursery reception Malawi",
+    "primary education Blantyre",
+  ],
+  alternates: { canonical: "/academics" },
+  openGraph: {
+    type: "website",
+    url: "/academics",
+    siteName: "Mount View International Primary School",
+    title:
+      "Academics — Cambridge Curriculum from Early Years to Year 6 | Mount View",
+    description:
+      "Cambridge Early Years and Cambridge Primary curriculum at Mount View International Primary School, Blantyre, Malawi.",
+    locale: "en_MW",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Academics — Cambridge Curriculum at Mount View",
+    description:
+      "Cambridge Early Years and Cambridge Primary curriculum in Blantyre, Malawi.",
+  },
+};
 
 /* ------------------------------------------------------------------ */
 /*  API                                                                */
@@ -69,7 +120,7 @@ function limitWords(str: string | null | undefined, max = MAX_STORY_WORDS): stri
 const earlyYearsStages = [
   {
     title: "Foundation Stage",
-    age: "18 months – 3 years",
+    age: "20 months – 3 years",
     focus: "Exploration, Sensory Play & Social Development",
     desc: "Children begin their learning journey through sensory-rich experiences and gentle social interactions. Our nurturing environment encourages trust, curiosity, and joyful discovery.",
     emoji: "🐣",
@@ -94,8 +145,8 @@ const earlyYearsStages = [
     ring: "ring-[#F58220]",
     chip: "bg-[#F58220] text-white",
     areas: [
-      { name: "Communication & Language", detail: "Vocabulary growth, questioning, multi-step instructions", icon: "🗣️" },
-      { name: "Physical Development", detail: "Cutting, drawing, balance", icon: "✂️" },
+      { name: "Communication & Language", detail: "Vocabulary growth, questioning, multi-step instructions. Role play to encourage sharing, collaboration and expression.", icon: "🗣️" },
+      { name: "Physical Development", detail: "Cutting, drawing, balance. Swimming: water familiarity, safety and building water confidence.", icon: "✂️" },
       { name: "Personal, Social & Emotional", detail: "Empathy, routine-following, independent choices", icon: "🤝" },
       { name: "Mathematics", detail: "Counting, sorting, patterns, quantifying", icon: "🔢" },
       { name: "Literacy", detail: "Letter recognition, phonemic awareness, CVC words, storytelling", icon: "📚" },
@@ -112,12 +163,12 @@ const earlyYearsStages = [
     ring: "ring-[#252B68]",
     chip: "bg-[#252B68] text-white",
     areas: [
-      { name: "Communication & Language", detail: "Speaking in complete sentences, storytelling, event description", icon: "💬" },
+      { name: "Communication & Language", detail: "Speaking in complete sentences, storytelling, event description. Role play to build and strengthen vocabulary and introduce new vocabulary.", icon: "💬" },
       { name: "Physical Development", detail: "Writing, team games, hygiene management", icon: "⚽" },
-      { name: "Personal, Social & Emotional", detail: "Conflict resolution, task responsibility", icon: "🕊️" },
-      { name: "Mathematics", detail: "Counting, addition & subtraction, patterns, shapes, time & measurement", icon: "➗" },
-      { name: "Literacy", detail: "Reading simple words & sentences, sentence writing, story structure", icon: "📝" },
-      { name: "Understanding the World", detail: "Experiments, maps, cultures", icon: "🗺️" },
+      { name: "Personal, Social & Emotional", detail: "Conflict resolution, task responsibility, leadership, expression and feelings", icon: "🕊️" },
+      { name: "Mathematics", detail: "Counting, addition and subtraction, patterns, shapes, time and measurement", icon: "➗" },
+      { name: "Literacy", detail: "Reading simple words and sentences, sentence writing, story structure. Story retelling in own words, reading decodable books, phonics programme.", icon: "📝" },
+      { name: "Understanding the World", detail: "Experiments, maps, cultures. Relate or make links to their experiences and everyday lives. Encourage questions and fact finding to answer their questions.", icon: "🗺️" },
       { name: "Creative Arts & Expression", detail: "Art planning, group performance, rhythm", icon: "🎵" },
     ],
   },
@@ -125,23 +176,44 @@ const earlyYearsStages = [
 
 const primaryStages = [
   {
-    title: "Key Stage 1",
-    age: "Year 1 & Year 2",
-    focus: "Foundational Literacy, Numeracy & Curiosity",
-    desc: "Focus on providing engaging and meaningful learning experiences to prepare students academically and socially.",
+    title: "Year 1",
+    age: "Year 1 · Age 5–6",
+    focus: "Foundation Skills, Phonics & Curiosity",
+    desc: "A year of building strong foundations in literacy and numeracy while sparking curiosity across the wider curriculum.",
     details:
-      "Special emphasis on foundational skills in English (including Phonics) and Mathematics. Other subjects like Global Perspective, ICT, Art, Music and PE are integrated into topic-themed lessons.",
-    emoji: "🚀",
+      "English and Mathematics form the core, supported by Science, Global Perspectives, ICT, Art, Music, PE and Swimming.",
+    emoji: "🌱",
     ring: "ring-[#FFE900]",
     chip: "bg-[#FFE900] text-[#252B68]",
     areas: [
-      { name: "English & Phonics", detail: "Letters and Sounds phases 2–6; fluent reading, accurate spelling", icon: "📖" },
-      { name: "Mathematics", detail: "Number sense, patterns, shapes, and mathematical thinking", icon: "🔢" },
-      { name: "Science", detail: "Curiosity, observation, and investigation of the world around us", icon: "🔬" },
-      { name: "Global Perspective", detail: "Topic-themed exploration of the world", icon: "🌍" },
-      { name: "ICT", detail: "Purposeful and confident use of technology", icon: "💻" },
-      { name: "Art & Music", detail: "Creativity, expression, rhythm, and performance", icon: "🎨" },
-      { name: "PE & Swimming", detail: "Movement, teamwork, water safety and confidence", icon: "🏊" },
+      { name: "English & Phonics", detail: "Letter sounds, blending, segmenting, reading, spelling, handwriting, sentence writing, comprehension and vocabulary.", icon: "📖" },
+      { name: "Mathematics", detail: "Number recognition, counting, number bonds, addition, subtraction, patterns, 2D and 3D shapes, measurement and problem-solving.", icon: "🔢" },
+      { name: "Science", detail: "Living and non-living things, human body, senses, plants, animals, materials, observation and investigation.", icon: "🔬" },
+      { name: "Global Perspectives", detail: "Our country, different cultures, similarities and differences, other countries, communities and uses of water.", icon: "🌍" },
+      { name: "ICT", detail: "Computer skills, technology, digital learning, keyboard skills and online safety.", icon: "💻" },
+      { name: "Art & Music", detail: "Drawing, painting, colouring, creativity, craft, singing, rhythm, movement and performance.", icon: "🎨" },
+      { name: "PE & Swimming", detail: "Physical fitness, coordination, balance, movement, teamwork, games, swimming skills and water safety.", icon: "🏊" },
+    ],
+  },
+  {
+    title: "Year 2",
+    age: "Year 2 · Age 6–7",
+    focus: "Confident Readers, Problem-Solvers & Communicators",
+    desc: "Building on Year 1 foundations, children grow as confident readers, writers and problem-solvers, ready for Key Stage 2.",
+    details:
+      "Greater depth in English and Mathematics, plus Science, Global Perspectives, ICT, PE and Swimming, Music and Art.",
+    emoji: "🚀",
+    ring: "ring-[#F58220]",
+    chip: "bg-[#F58220] text-white",
+    areas: [
+      { name: "English", detail: "Phonics, reading, comprehension, spelling, vocabulary, grammar, punctuation, handwriting and creative writing.", icon: "📖" },
+      { name: "Mathematics", detail: "Number recognition, place value, counting, addition, subtraction, multiplication, division, shapes, measurement, time and problem-solving.", icon: "🔢" },
+      { name: "Science", detail: "Plants, animals, humans, materials, seasons, habitats, weather, observation and investigations.", icon: "🔬" },
+      { name: "Global Perspectives", detail: "Our community, family, transport, environment, cultures, communication, teamwork and global awareness.", icon: "🌍" },
+      { name: "ICT", detail: "Computer skills, keyboard and mouse use, digital literacy, online safety and basic programming.", icon: "💻" },
+      { name: "PE & Swimming", detail: "Fitness, coordination, balance, movement, teamwork, sports skills, water confidence and swimming techniques.", icon: "🏊" },
+      { name: "Music", detail: "Singing, rhythm, beat, listening, musical instruments, patterns and creative expression.", icon: "🎵" },
+      { name: "Art", detail: "Drawing, painting, colouring, printing, collage, patterns, creativity and exploring different materials.", icon: "🎨" },
     ],
   },
   {
@@ -150,15 +222,15 @@ const primaryStages = [
     focus: "Wider Curriculum & Real-World Contexts",
     desc: "Continuing to emphasise core subjects like English and Mathematics while broadening the learning experience.",
     details:
-      "Students explore Science, Global Perspective, Art and Music. PE lessons remain a regular part of the curriculum. The curriculum is carefully planned to link subject areas and provide real-world contexts.",
+      "Students explore Science, Global Perspectives, Art and Music. PE lessons remain a regular part of the curriculum. The curriculum is carefully planned to link subject areas and provide real-world contexts.",
     emoji: "🧭",
-    ring: "ring-[#F58220]",
-    chip: "bg-[#F58220] text-white",
+    ring: "ring-[#252B68]",
+    chip: "bg-[#252B68] text-white",
     areas: [
       { name: "English", detail: "Reading comprehension, extended writing, vocabulary", icon: "📖" },
       { name: "Mathematics", detail: "Reasoning, problem-solving, and fluency in number", icon: "∑" },
       { name: "Science", detail: "Investigation, experimentation, scientific thinking", icon: "⚗️" },
-      { name: "Global Perspective", detail: "Real-world contexts, sustainability, community", icon: "🌍" },
+      { name: "Global Perspectives", detail: "Real-world contexts, sustainability, community", icon: "🌍" },
       { name: "ICT & Computing", detail: "Digital design, coding basics, purposeful use", icon: "💻" },
       { name: "Art, Music & PE", detail: "Creative technique, performance, physical education", icon: "🎨" },
       { name: "Swimming & Sport", detail: "Regular PE lessons, water confidence, teamwork", icon: "🏊" },
@@ -172,13 +244,13 @@ const primaryStages = [
     details:
       "Supported in developing critical thinking skills, questioning, and exploring various topics. The curriculum is meticulously aligned with learning objectives to prepare students for the Cambridge Checkpoint exams at the end of Year 6.",
     emoji: "🎓",
-    ring: "ring-[#252B68]",
-    chip: "bg-[#252B68] text-white",
+    ring: "ring-[#FFE900]",
+    chip: "bg-[#FFE900] text-[#252B68]",
     areas: [
       { name: "English", detail: "Extended writing, comprehension, critical reading", icon: "📝" },
       { name: "Mathematics", detail: "Advanced problem-solving and mathematical reasoning", icon: "∑" },
       { name: "Science", detail: "Scientific method, investigation, and evidence", icon: "⚗️" },
-      { name: "Global Perspective", detail: "Global challenges, action, and community impact", icon: "🌍" },
+      { name: "Global Perspectives", detail: "Global challenges, action, and community impact", icon: "🌍" },
       { name: "ICT & Computing", detail: "Digital literacy, coding, and design thinking", icon: "💻" },
       { name: "Arts & Performance", detail: "Portfolio development, ensembles, stagecraft", icon: "🎨" },
       { name: "Cambridge Checkpoint", detail: "Targeted preparation for the Year 6 Checkpoint exams", icon: "🏆" },
@@ -189,29 +261,27 @@ const primaryStages = [
 const stageGroups = [
   {
     id: "early-years",
-    tag: "Stage 1",
     title: "Cambridge Early Years",
-    ageLabel: "18 months – 5 years",
+    ageLabel: "20 months – 5 years",
     framework: "Cambridge Early Years",
     intro:
-      "Our 3-year curriculum, inspired by the globally recognised Cambridge Early Years framework, is thoughtfully designed for children aged 18 months to 5 years. Through a play-based, inquiry-driven approach, we nurture holistic development across key learning domains — ensuring every child grows with confidence, curiosity, and compassion.",
-    image: "/images/ey.jpg",
+      "Our 3-year curriculum, inspired by the globally recognised Cambridge Early Years framework, is thoughtfully designed for children aged 20 months to 5 years. Through a play-based, inquiry-driven approach, we nurture holistic development across key learning domains, ensuring every child grows with confidence, curiosity, and compassion.",
+    image: "/images/reception.jpg",
     accent: "yellow",
     childStages: earlyYearsStages,
     why: [
-      { title: "Global perspective and cultural awareness", icon: "🌍", img: "/images/early-years-global.jpg" },
-      { title: "Child-centred learning tailored to individual needs", icon: "🧩", img: "/images/early-years-child.jpg" },
-      { title: "Developmentally appropriate practices that spark creativity and critical thinking", icon: "💡", img: "/images/early-years-creative.jpg" },
+      { title: "Global perspective and cultural awareness", icon: "🌍", img: "/images/aqua-life.jpeg" },
+      { title: "Child-centred learning tailored to individual needs", icon: "🧩", img: "/images/ey-child.jpeg" },
+      { title: "Developmentally appropriate practices that spark creativity and critical thinking", icon: "💡", img: "/images/ey-stages.jpeg" },
     ],
   },
   {
     id: "primary",
-    tag: "Stage 2",
     title: "Cambridge Primary",
     ageLabel: "5 – 11 years · Year 1 to Year 6",
     framework: "Cambridge Primary",
     intro:
-      "Cambridge Primary blends academic rigour with flexibility and creativity. Students build deep knowledge in English, Mathematics and Science, enriched with Global Perspective, Digital Literacy, Art, Music, Dance and Physical Education — and are prepared with confidence for the Cambridge Checkpoint exams at the end of Year 6.",
+      "Cambridge Primary blends academic rigour with flexibility and creativity. Students build deep knowledge in English, Mathematics and Science, enriched with Global Perspective, Digital Literacy, Art, Music, Dance and Physical Education, and are prepared with confidence for the Cambridge Checkpoint exams at the end of Year 6.",
     image: "/images/ks1.jpg",
     accent: "navy",
     childStages: primaryStages,
@@ -223,14 +293,14 @@ const curriculumAreas = [
   {
     icon: "📖",
     title: "English, Mathematics & Science",
-    desc: "Academic rigour blended with flexibility and creativity — the beating heart of our Cambridge Primary programme.",
-    image: "/images/steam-learning.jpg",
+    desc: "Academic rigour blended with flexibility and creativity, the beating heart of our Cambridge Primary programme.",
+    image: "/images/class-image.jpg",
   },
   {
     icon: "🌍",
-    title: "Global Perspective",
-    desc: "Students explore sustainability, equality, technology and cultural diversity — then act on what they learn.",
-    image: "/images/early-years-global.jpg",
+    title: "Global Perspectives",
+    desc: "Students explore sustainability, equality, technology and cultural diversity, then act on what they learn.",
+    image: "/images/gp2.JPG",
   },
   {
     icon: "💻",
@@ -241,8 +311,8 @@ const curriculumAreas = [
   {
     icon: "🎨",
     title: "Art, Music, Dance & PE",
-    desc: "Expression, movement and performance — because a broad curriculum builds a whole child.",
-    image: "/images/creative-arts.jpg",
+    desc: "Expression, movement and performance, because a broad curriculum builds a whole child.",
+    image: "/images/creative-arts3.jpg",
   },
 ];
 
@@ -251,38 +321,38 @@ const coreSubjects = [
     title: "English & Phonics",
     desc: "Developing strong communication. In Early Years and Reception, we use Jolly Phonics. In Key Stage 1, we use 'Letters and Sounds' (phases 2 to 6) to turn pupils into fluent readers and accurate spellers.",
     icon: "Aa",
-    image: "/images/creative-arts.jpg",
+    image: "/images/phonics.jpg",
   },
   {
     title: "Mathematics",
     desc: "Building confidence with numbers, patterns, problem-solving, and mathematical thinking through meaningful, hands-on learning experiences.",
     icon: "∑",
-    image: "/images/steam-learning.jpg",
+    image: "/images/maths.jpeg",
   },
   {
     title: "Science",
     desc: "Encouraging curiosity through observation, investigation, experimentation, and understanding the world around us.",
     icon: "⚗",
-    image: "/images/science.jpg",
+    image: "/images/uks.JPG",
   },
 ];
 
 const otherSubjects = [
-  { icon: "🌍", title: "Global Perspective", desc: "Understanding global concepts and basic ICT skills through interactive lessons.", image: "/images/early-years-global.jpg" },
+  { icon: "🌍", title: "Global Perspectives", desc: "Understanding global concepts and basic ICT skills through interactive lessons.", image: "/images/gp.JPG" },
   { icon: "💻", title: "ICT", desc: "Purposeful use of technology to support creativity, communication, and digital confidence.", image: "/images/ict.JPG" },
-  { icon: "🎨", title: "Art", desc: "Imagination, visual expression, and creative techniques through hands-on activities.", image: "/images/creative-arts.jpg" },
-  { icon: "🎵", title: "Music", desc: "Exploring rhythm, melody, performance, and musical creativity.", image: "/images/creative-arts.jpg" },
-  { icon: "🏃", title: "PE", desc: "Enhancing sports skills, teamwork, and physical development.", image: "/images/sports.JPG" },
-  { icon: "🏊", title: "Swimming", desc: "Water confidence, coordination, safety, and an important life skill.", image: "/images/sports.JPG" },
-  { icon: "🤗", title: "Learning Support", desc: "Inclusive education helping every child succeed at their own pace.", image: "/images/early-years-child.jpg" },
+  { icon: "🎨", title: "Art", desc: "Imagination, visual expression, and creative techniques through hands-on activities.", image: "/images/painting.JPG" },
+  { icon: "🎵", title: "Music", desc: "Exploring rhythm, melody, performance, and musical creativity.", image: "/images/music.jpg" },
+  { icon: "🏃", title: "PE", desc: "Enhancing sports skills, teamwork, and physical development.", image: "/images/football.jpg" },
+  { icon: "🏊", title: "Swimming", desc: "Water confidence, coordination, safety, and an important life skill.", image: "/images/swimming2.JPG" },
+  { icon: "🤗", title: "Learning Support", desc: "Inclusive education helping every child succeed at their own pace.", image: "/images/learning-support.jpeg" },
 ];
 
 const outdoorPoints = [
-  { icon: "❓", title: "Big questions, real problems", desc: "Lessons are designed around big questions and real-world problems.", image: "/images/school-life.jpg" },
-  { icon: "🧪", title: "Hands-on discovery", desc: "Students engage in hands-on activities, experiments, group discussions, and field research.", image: "/images/science.jpg" },
+  { icon: "❓", title: "Big questions, real problems", desc: "Lessons are designed around big questions and real-world problems.", image: "/images/class-image.jpg" },
+  { icon: "🧪", title: "Hands-on discovery", desc: "Students engage in hands-on activities, experiments, group discussions, and field research.", image: "/images/uks.JPG" },
   { icon: "🧑‍🏫", title: "Teachers as facilitators", desc: "Teachers guide exploration and support individual growth rather than simply delivering content.", image: "/images/creative-arts.jpg" },
-  { icon: "🚌", title: "Learning beyond walls", desc: "Regular field trips, nature walks, and cultural excursions connect classroom concepts with the real world.", image: "/images/school-life.jpg" },
-  { icon: "🎯", title: "Skill Enhancement Clubs", desc: "Purposeful clubs that let learners explore new interests and build practical skills in a fun, supportive setting.", image: "/images/creative-arts.jpg" },
+  { icon: "🚌", title: "Learning beyond walls", desc: "Regular field trips, nature walks, and cultural excursions connect classroom concepts with the real world.", image: "/images/trips.jpg" },
+  { icon: "🎯", title: "Skill Enhancement Clubs", desc: "Purposeful clubs that let learners explore new interests and build practical skills in a fun, supportive setting.", image: "/images/gardening1.jpg" },
 ];
 
 const wellbeingPoints = [
@@ -291,9 +361,9 @@ const wellbeingPoints = [
 ];
 
 const personalisedPoints = [
-  { icon: "🎯", text: "Skill Enhancement Clubs tailored to individual interests and strengths", image: "/images/creative-arts.jpg" },
-  { icon: "📝", text: "Regular formative feedback instead of one-size-fits-all grading", image: "/images/steam-learning.jpg" },
-  { icon: "📈", text: "Goal-setting with teachers to foster agency and accountability", image: "/images/school-life.jpg" },
+  { icon: "🎯", text: "Skill Enhancement tailored to individual interests and strengths", image: "/images/teacher-support2.jpeg" },
+  { icon: "📝", text: "Regular formative feedback instead of one-size-fits-all grading", image: "/images/teacher-support3.jpg" },
+  { icon: "📈", text: "Goal-setting with teachers to foster agency and accountability", image: "/images/mothers-day3.jpg" },
 ];
 
 const fallbackLeadership = [
@@ -313,7 +383,7 @@ const whyChooseUs = [
 ];
 
 const marqueeItems = [
-  "English", "Mathematics", "Science", "Global Perspective", "Digital Literacy",
+  "English", "Mathematics", "Science", "Global Perspectives", "Digital Literacy",
   "Computing", "Art", "Music", "Dance", "Physical Education", "Swimming",
   "Outdoor Learning", "Wellbeing", "Leadership", "Multilingual Literacy",
 ];
@@ -467,6 +537,57 @@ export default async function AcademicsPage() {
 
   return (
     <main className="overflow-hidden bg-white text-[#172033]">
+      {/* =========================================================
+          SEO — Structured Data
+      ========================================================== */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "WebPage",
+                "@id": "https://mountviewmw.com/academics#page",
+                url: "https://mountviewmw.com/academics",
+                name: "Academics at Mount View International Primary School",
+                description:
+                  "Cambridge Early Years and Cambridge Primary curriculum in Blantyre, Malawi.",
+                isPartOf: { "@id": "https://mountviewmw.com/#website" },
+                about: { "@id": "https://mountviewmw.com/#school" },
+                breadcrumb: {
+                  "@type": "BreadcrumbList",
+                  itemListElement: [
+                    {
+                      "@type": "ListItem",
+                      position: 1,
+                      name: "Home",
+                      item: "https://mountviewmw.com",
+                    },
+                    {
+                      "@type": "ListItem",
+                      position: 2,
+                      name: "Academics",
+                      item: "https://mountviewmw.com/academics",
+                    },
+                  ],
+                },
+              },
+              {
+                "@type": "EducationalOccupationalProgram",
+                "@id": "https://mountviewmw.com/academics#programme",
+                name: "Cambridge Primary and Early Years Programme",
+                provider: { "@id": "https://mountviewmw.com/#school" },
+                educationalProgramMode: "full-time",
+                programPrerequisites: "Children aged 20 months to 11 years",
+                timeToComplete: "P10Y",
+                occupationalCategory: "Primary Education",
+              },
+            ],
+          }),
+        }}
+      />
+
       <style>{`
         @keyframes mv-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(8deg)} }
         @keyframes mv-float-alt { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(14px) rotate(-8deg)} }
@@ -527,15 +648,15 @@ export default async function AcademicsPage() {
             </h1>
 
             <p className="mt-7 max-w-2xl text-lg leading-8 text-blue-100 sm:text-xl">
-              At Mount View International, we empower young learners to become
-              curious thinkers, confident communicators, and compassionate global
-              citizens.
+              At Mount View International in Blantyre, Malawi, we empower young
+              learners to become curious thinkers, confident communicators, and
+              compassionate global citizens.
             </p>
             <p className="mt-4 max-w-2xl leading-8 text-blue-200/90">
               Located in a vibrant natural setting with a beautiful view, our
-              primary school provides a nurturing environment where children aged
-              5 to 11 years thrive through world-class education and meaningful
-              exploration.
+              school provides a nurturing environment where children aged 20
+              months to 11 years thrive through world-class Cambridge education
+              and meaningful exploration.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
@@ -556,7 +677,7 @@ export default async function AcademicsPage() {
 
             <div className="mt-10 flex flex-wrap gap-3">
               {[
-                "Ages 2+ – 5 · Early Years",
+                "20 months – 5 · Early Years",
                 "Ages 5 – 11 · Primary",
                 "Cambridge Curriculum",
               ].map((chip) => (
@@ -575,8 +696,8 @@ export default async function AcademicsPage() {
               <div className="pointer-events-none absolute -inset-3 z-0 rounded-[2.5rem] bg-[#FFE900]/20 blur-2xl" />
               <div className="relative z-10 overflow-hidden rounded-[2rem] border-[10px] border-white/10 bg-[#171B4A] shadow-2xl ring-1 ring-white/10">
                 <ImageWithFallback
-                  src="/images/steam-learning.jpg"
-                  alt="Learning at Mount View International"
+                  src="/images/students-activity.jpeg"
+                  alt="Cambridge Primary learning at Mount View International Primary School in Blantyre, Malawi"
                   className="aspect-[4/3] w-full object-cover"
                 />
               </div>
@@ -612,7 +733,7 @@ export default async function AcademicsPage() {
         </div>
       </section>
 
-      {/* ✅ OUR CURRICULUM — anchor added */}
+      {/* OUR CURRICULUM */}
       <section
         id="our-curriculum"
         className="relative scroll-mt-24 bg-white py-20 sm:py-24"
@@ -620,7 +741,7 @@ export default async function AcademicsPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             eyebrow="Our Curriculum"
-            title="Cambridge — rigour, flexibility and creativity."
+            title="Cambridge: rigour, flexibility and creativity."
             subtitle="We follow the internationally recognised Cambridge Curriculum, which blends academic rigour with flexibility and creativity."
           />
 
@@ -634,7 +755,7 @@ export default async function AcademicsPage() {
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <ImageWithFallback
                     src={area.image}
-                    alt={area.title}
+                    alt={`${area.title} at Mount View International Primary School, Blantyre`}
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
@@ -658,8 +779,8 @@ export default async function AcademicsPage() {
             <div className="grid items-center gap-0 md:grid-cols-[1fr_1.4fr]">
               <div className="relative aspect-[16/10] md:aspect-auto md:h-full">
                 <ImageWithFallback
-                  src="/images/school-life.jpg"
-                  alt="Experiential learning outdoors"
+                  src="/images/culture1.jpg"
+                  alt="Experiential outdoor learning at Mount View in Blantyre"
                   className="h-full w-full object-cover"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-transparent to-[#252B68]/60 md:bg-gradient-to-r md:from-transparent md:to-[#252B68]" />
@@ -681,13 +802,13 @@ export default async function AcademicsPage() {
         </div>
       </section>
 
-      {/* ✅ OUR STAGES — `#early-years` and `#primary` live inside stageGroups */}
+      {/* OUR STAGES */}
       <section className="bg-slate-50 py-20 sm:py-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <SectionTitle
             eyebrow="Our Stages"
             title="Two Cambridge stages. One continuous journey."
-            subtitle="Every learner moves through Cambridge Early Years into Cambridge Primary — building confidence, knowledge and independence along the way."
+            subtitle="Every learner moves through Cambridge Early Years into Cambridge Primary, building confidence, knowledge and independence along the way."
           />
 
           <div className="mt-16 space-y-24">
@@ -704,12 +825,9 @@ export default async function AcademicsPage() {
                       <div className="relative">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="rounded-full bg-[#FFE900] px-3 py-1 text-[11px] font-black uppercase tracking-widest text-[#252B68]">
-                            {group.tag}
-                          </span>
-                          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold text-white backdrop-blur">
                             {group.framework}
                           </span>
-                          <span className="rounded-full border border-white/20 bg-white/5 px-3 py-1 text-[11px] font-bold text-white/80 backdrop-blur">
+                          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-bold text-white backdrop-blur">
                             {group.ageLabel}
                           </span>
                         </div>
@@ -738,7 +856,7 @@ export default async function AcademicsPage() {
                     <div className="relative order-1 min-h-[280px] lg:order-2">
                       <ImageWithFallback
                         src={group.image}
-                        alt={group.title}
+                        alt={`${group.title} at Mount View International Primary School in Blantyre`}
                         className="h-full w-full object-cover"
                       />
                       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#252B68]/70 via-transparent to-transparent lg:bg-gradient-to-l lg:from-[#252B68]/70 lg:via-transparent lg:to-transparent" />
@@ -766,7 +884,7 @@ export default async function AcademicsPage() {
                           <div className="relative aspect-[4/3] overflow-hidden">
                             <ImageWithFallback
                               src={item.img}
-                              alt={item.title}
+                              alt={`${item.title} at Mount View Early Years Centre in Blantyre`}
                               className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-[#252B68] via-[#252B68]/25 to-transparent" />
@@ -799,13 +917,8 @@ export default async function AcademicsPage() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════════════════════════════════
-          CENTRAL HIGH SCHOOL — THE NEXT CHAPTER
-          Shown immediately after the key stages so parents see where
-          the journey continues once Year 6 is complete.
-      ══════════════════════════════════════════════════════════════ */}
+      {/* CENTRAL HIGH SCHOOL */}
       <section className="relative overflow-hidden bg-gradient-to-br from-[#171B4A] via-[#252B68] to-[#20265E] py-20 sm:py-24">
-        {/* Background décor */}
         <div className="pointer-events-none absolute inset-0">
           <div className="mv-blob absolute -left-40 top-10 h-[28rem] w-[28rem] rounded-full bg-[#FFE900]/10 blur-3xl" />
           <div className="mv-blob absolute -right-32 bottom-0 h-[28rem] w-[28rem] rounded-full bg-[#F58220]/20 blur-3xl [animation-delay:-6s]" />
@@ -817,7 +930,6 @@ export default async function AcademicsPage() {
 
         <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
-            {/* ── LEFT: Content ── */}
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-[#FFE900]/30 bg-[#FFE900]/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900] backdrop-blur">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#FFE900]" />
@@ -849,8 +961,9 @@ export default async function AcademicsPage() {
                 <strong className="font-black text-white">
                   Cambridge Primary Checkpoint
                 </strong>{" "}
-                examinations at Mount View, their educational journey doesn&rsquo;t
-                end — it evolves. Our graduates progress naturally to{" "}
+                examinations at Mount View, their educational journey
+                doesn&rsquo;t end, it evolves. Our graduates progress naturally
+                to{" "}
                 <strong className="font-black text-[#FFE900]">
                   Central High School
                 </strong>
@@ -858,7 +971,6 @@ export default async function AcademicsPage() {
                 and Cambridge pathway continue without interruption.
               </p>
 
-              {/* Key benefits */}
               <ul className="mt-8 grid gap-3 sm:grid-cols-2">
                 {[
                   {
@@ -903,7 +1015,6 @@ export default async function AcademicsPage() {
                 ))}
               </ul>
 
-              {/* CTA buttons */}
               <div className="mt-9 flex flex-col gap-3 sm:flex-row">
                 <a
                   href="https://centralhighmw.com/"
@@ -928,13 +1039,11 @@ export default async function AcademicsPage() {
               </div>
             </div>
 
-            {/* ── RIGHT: Pathway visual ── */}
             <div className="relative">
               <div className="pointer-events-none absolute -inset-4 rounded-[2.5rem] bg-[#FFE900]/10 blur-2xl" />
 
               <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.03] p-6 shadow-2xl backdrop-blur-sm sm:p-8">
                 <div className="space-y-4">
-                  {/* Mount View card */}
                   <div className="rounded-2xl border border-[#F58220]/40 bg-gradient-to-br from-[#F58220]/15 to-transparent p-5">
                     <div className="flex items-center justify-between">
                       <span className="rounded-full bg-[#F58220] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-white">
@@ -955,7 +1064,6 @@ export default async function AcademicsPage() {
                     </p>
                   </div>
 
-                  {/* Arrow connector */}
                   <div className="flex items-center justify-center py-1">
                     <div className="flex flex-col items-center gap-1">
                       <div className="h-6 w-0.5 bg-gradient-to-b from-[#F58220] to-[#FFE900]" />
@@ -966,7 +1074,6 @@ export default async function AcademicsPage() {
                     </div>
                   </div>
 
-                  {/* Central High card */}
                   <div className="rounded-2xl border border-[#FFE900]/40 bg-gradient-to-br from-[#FFE900]/15 to-transparent p-5">
                     <div className="flex items-center justify-between">
                       <span className="rounded-full bg-[#FFE900] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-widest text-[#252B68]">
@@ -988,9 +1095,8 @@ export default async function AcademicsPage() {
                   </div>
                 </div>
 
-                {/* Bottom tagline */}
                 <p className="mt-6 rounded-xl bg-[#FFE900]/10 px-4 py-3 text-center text-[11px] font-bold uppercase tracking-widest text-[#FFE900]">
-                  One continuous journey — 18 months to 18 years
+                  One continuous journey · 20 months to 18 years
                 </p>
               </div>
             </div>
@@ -1014,7 +1120,7 @@ export default async function AcademicsPage() {
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <ImageWithFallback
                     src={subject.image}
-                    alt={subject.title}
+                    alt={`${subject.title} lessons at Mount View International Primary School`}
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
@@ -1034,7 +1140,7 @@ export default async function AcademicsPage() {
         </div>
       </section>
 
-      {/* ✅ OTHER SUBJECTS — anchor added */}
+      {/* OTHER SUBJECTS */}
       <section
         id="other-subjects"
         className="scroll-mt-24 bg-white py-20 sm:py-24"
@@ -1053,7 +1159,7 @@ export default async function AcademicsPage() {
                 <div className="relative aspect-[16/9] overflow-hidden">
                   <ImageWithFallback
                     src={subject.image}
-                    alt={subject.title}
+                    alt={`${subject.title} at Mount View in Blantyre, Malawi`}
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
@@ -1096,7 +1202,7 @@ export default async function AcademicsPage() {
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <ImageWithFallback
                     src={point.image}
-                    alt={point.title}
+                    alt={`${point.title} at Mount View International Primary School`}
                     className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
@@ -1132,8 +1238,8 @@ export default async function AcademicsPage() {
             <div className="relative overflow-hidden rounded-[2rem] bg-[#252B68] text-white shadow-2xl">
               <div className="relative aspect-[16/9] overflow-hidden">
                 <ImageWithFallback
-                  src="/images/early-years-global.jpg"
-                  alt="Global perspective at Mount View"
+                  src="/images/gp4.jpeg"
+                  alt="Global Perspectives programme at Mount View in Blantyre"
                   className="h-full w-full object-cover"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#252B68] via-[#252B68]/40 to-transparent" />
@@ -1141,13 +1247,13 @@ export default async function AcademicsPage() {
               </div>
               <div className="relative p-9 sm:p-11">
                 <p className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text-xs font-black uppercase tracking-[0.2em] text-[#FFE900]">
-                  Global Perspective
+                  Global Perspectives
                 </p>
                 <h3 className="mt-5 text-2xl font-black leading-tight sm:text-3xl">
                   Future leaders in a global community.
                 </h3>
                 <p className="mt-4 leading-8 text-blue-100">
-                  Our students are more than learners — they&apos;re future leaders
+                  Our students are more than learners, they&apos;re future leaders
                   in a global community and need to be raised as independent
                   learners with strong values. During their formative years we
                   provide:
@@ -1169,11 +1275,11 @@ export default async function AcademicsPage() {
                 <p className="mt-6 rounded-2xl bg-white/10 p-5 text-sm leading-7 text-blue-50 backdrop-blur">
                   We integrate the{" "}
                   <strong className="text-[#FFE900]">
-                    Cambridge Global Perspective Programme
+                    Cambridge Global Perspectives Programme
                   </strong>
-                  , introducing students to global challenges like sustainability,
-                  equality, technology and cultural diversity — and empowering them
-                  to make a difference.
+                  , introducing students to global challenges like
+                  sustainability, equality, technology and cultural diversity,
+                  and empowering them to make a difference.
                 </p>
               </div>
             </div>
@@ -1181,8 +1287,8 @@ export default async function AcademicsPage() {
             <div className="relative overflow-hidden rounded-[2rem] bg-[#FFE900] text-[#252B68] shadow-2xl">
               <div className="relative aspect-[16/9] overflow-hidden">
                 <ImageWithFallback
-                  src="/images/creative-arts.jpg"
-                  alt="Multilingual and cultural literacy at Mount View"
+                  src="/images/african-day.jpg"
+                  alt="Multilingual and cultural literacy at Mount View, Blantyre"
                   className="h-full w-full object-cover"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#FFE900] via-[#FFE900]/40 to-transparent" />
@@ -1203,7 +1309,7 @@ export default async function AcademicsPage() {
                 </p>
                 <p className="mt-4 leading-8 text-[#252B68]/80">
                   Through cross-cultural projects and exchanges, they gain
-                  first-hand insights into diverse ways of living and thinking —
+                  first-hand insights into diverse ways of living and thinking,
                   building bridges across borders and becoming thoughtful citizens
                   of the world.
                 </p>
@@ -1230,11 +1336,11 @@ export default async function AcademicsPage() {
             <div>
               <SectionTitle
                 eyebrow="Holistic Wellbeing & Emotional Intelligence"
-                title="Growing happy, healthy humans."
+                title="Growing as happy, healthy humans."
                 center={false}
               />
               <p className="mt-6 leading-8 text-slate-600">
-                Success isn&apos;t just measured by grades — it&apos;s also seen in
+                Success isn&apos;t just measured by grades, it&apos;s also seen in
                 kindness, resilience, and empathy. That&apos;s why our school
                 integrates mindfulness, emotional check-ins, and conflict
                 resolution into the school day. Students learn to manage their
@@ -1243,14 +1349,14 @@ export default async function AcademicsPage() {
               </p>
               <p className="mt-4 leading-8 text-slate-600">
                 Our wellbeing programme creates a school culture where every child
-                feels safe, supported, and empowered to thrive — not just
+                feels safe, supported, and empowered to thrive, not just
                 academically, but personally. Safe spaces for reflection and
                 emotional support are created to support students in times of need.
               </p>
 
               <div className="relative mt-8 overflow-hidden rounded-3xl shadow-lg">
                 <ImageWithFallback
-                  src="/images/early-years-child.jpg"
+                  src="/images/learning-support.jpeg"
                   alt="Learners supported through Mount View's wellbeing programme"
                   className="aspect-[16/9] w-full object-cover"
                 />
@@ -1328,7 +1434,7 @@ export default async function AcademicsPage() {
           </div>
 
           <p className="mx-auto mt-10 max-w-3xl text-center leading-8 text-slate-600">
-            Goal setting and reflection are part of our classroom DNA — helping
+            Goal setting and reflection are part of our classroom DNA, helping
             each child build confidence, autonomy, and a strong sense of purpose.
           </p>
         </div>
@@ -1344,7 +1450,7 @@ export default async function AcademicsPage() {
             dark
             eyebrow="Leadership & Global Citizenship"
             title="Confident voices, caring hearts, real impact."
-            subtitle="Real activities led by our students and teachers — capturing the moments where leadership, service and global citizenship come alive."
+            subtitle="Real activities led by our students and teachers, capturing the moments where leadership, service and global citizenship come alive."
           />
 
           <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -1357,7 +1463,7 @@ export default async function AcademicsPage() {
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <ImageWithFallback
                       src={card.imageUrl}
-                      alt={card.title}
+                      alt={`${card.title} at Mount View International Primary School`}
                       className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
                     />
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#171B4A] via-[#171B4A]/40 to-transparent" />
@@ -1415,7 +1521,7 @@ export default async function AcademicsPage() {
             <div className="relative aspect-[16/6] w-full">
               <ImageWithFallback
                 src="/images/school-life.jpg"
-                alt="Life at Mount View International"
+                alt="Life at Mount View International Primary School in Blantyre, Malawi"
                 className="h-full w-full object-cover"
               />
               <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#252B68] via-[#252B68]/40 to-transparent" />
@@ -1448,7 +1554,7 @@ export default async function AcademicsPage() {
         </div>
       </section>
 
-      {/* ✅ LEARNING SUPPORT — anchor added */}
+      {/* LEARNING SUPPORT */}
       <section
         id="learning-support"
         className="relative scroll-mt-24 overflow-hidden bg-[#FFE900] py-20 sm:py-24"
@@ -1459,8 +1565,8 @@ export default async function AcademicsPage() {
           <div className="grid items-center gap-10 lg:grid-cols-[1fr_1.1fr]">
             <div className="relative overflow-hidden rounded-[2rem] shadow-2xl">
               <ImageWithFallback
-                src="/images/early-years-creative.jpg"
-                alt="Learning support at Mount View"
+                src="/images/support.jpg"
+                alt="Learning support at Mount View, Blantyre"
                 className="aspect-[4/3] w-full object-cover"
               />
               <span className="mv-float absolute right-4 top-4 text-3xl">💛</span>
@@ -1478,7 +1584,7 @@ export default async function AcademicsPage() {
                 age. Teachers and specialist teachers can help most children
                 overcome the difficulties quickly and easily. This support can take
                 place inside or outside the mainstream classroom, one-to-one, or in
-                a small group — bespoke for each child.
+                a small group, bespoke for each child.
               </p>
             </div>
           </div>
@@ -1502,8 +1608,9 @@ export default async function AcademicsPage() {
             Ready to give your child a head start on a global future?
           </h2>
           <p className="mx-auto mt-5 max-w-2xl leading-8 text-white/90">
-            Discover the possibilities with Mount View International — a safe,
-            inclusive and inspiring place where every child shines.
+            Discover the possibilities with Mount View International in Blantyre,
+            Malawi: a safe, inclusive and inspiring place where every child
+            shines.
           </p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link

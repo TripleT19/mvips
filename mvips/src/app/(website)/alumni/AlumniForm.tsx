@@ -63,12 +63,22 @@ export default function AlumniForm() {
 
     // ---- light client-side checks ----
     const fullName = String(fd.get("full_name") || "").trim();
+    const email = String(fd.get("email") || "").trim();
     const yearLeft = Number(fd.get("year_left")) || null;
     const location = String(fd.get("location") || "").trim();
     const currentRole = String(fd.get("current_role") || "").trim();
 
-    if (!fullName || !yearLeft || !location || !currentRole) {
-      setErrorMessage("Please fill in all required fields marked with an asterisk.");
+    if (!fullName || !email || !yearLeft || !location || !currentRole) {
+      setErrorMessage(
+        "Please fill in all required fields marked with an asterisk."
+      );
+      setState("error");
+      return;
+    }
+
+    // Extra guard in case `type="email"` native validation is bypassed.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMessage("Please enter a valid email address.");
       setState("error");
       return;
     }
@@ -76,7 +86,7 @@ export default function AlumniForm() {
     // ---- build multipart payload ----
     const payload = new FormData();
     payload.append("full_name", fullName);
-    payload.append("email", String(fd.get("email") || "").trim());
+    payload.append("email", email);
     payload.append("phone", String(fd.get("phone") || "").trim());
     payload.append("year_left", String(yearLeft));
     payload.append("location", location);
@@ -84,7 +94,10 @@ export default function AlumniForm() {
     payload.append("organization", String(fd.get("organization") || "").trim());
     payload.append("bio", String(fd.get("bio") || "").trim());
     payload.append("linkedin_url", String(fd.get("linkedin_url") || "").trim());
-    payload.append("message_to_students", String(fd.get("message_to_students") || "").trim());
+    payload.append(
+      "message_to_students",
+      String(fd.get("message_to_students") || "").trim()
+    );
     payload.append("show_contact", fd.get("show_contact") === "on" ? "1" : "0");
     payload.append("consent", "1");
 
@@ -94,13 +107,14 @@ export default function AlumniForm() {
       const res = await fetch(`${API_URL}/api/alumni`, {
         method: "POST",
         headers: { Accept: "application/json" },
-        body: payload, // browser sets multipart boundary automatically
+        body: payload,
       });
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(
-          body?.message || `Submission failed (${res.status}). Please try again.`
+          body?.message ||
+            `Submission failed (${res.status}). Please try again.`
         );
       }
 
@@ -110,7 +124,9 @@ export default function AlumniForm() {
       setState("success");
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Something went wrong. Please try again."
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
       );
       setState("error");
     }
@@ -122,7 +138,9 @@ export default function AlumniForm() {
   if (state === "success") {
     return (
       <div className="relative overflow-hidden rounded-[2rem] border border-emerald-200 bg-emerald-50 p-10 text-center shadow-xl">
-        <span className="mv-float pointer-events-none absolute right-6 top-6 text-4xl opacity-40">🎉</span>
+        <span className="mv-float pointer-events-none absolute right-6 top-6 text-4xl opacity-40">
+          🎉
+        </span>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500 text-3xl text-white shadow-lg">
           ✓
         </div>
@@ -131,8 +149,8 @@ export default function AlumniForm() {
         </h3>
         <p className="mx-auto mt-3 max-w-md leading-7 text-emerald-800">
           Your details and photo have been received. Our team will review the
-          submission and add you to the alumni directory shortly. Welcome back to
-          the Mount View story.
+          submission and add you to the alumni directory shortly. Welcome back
+          to the Mount View story.
         </p>
         <button
           type="button"
@@ -169,7 +187,12 @@ export default function AlumniForm() {
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Full name" name="full_name" required placeholder="e.g. Jane Mwale" />
+          <Field
+            label="Full name"
+            name="full_name"
+            required
+            placeholder="e.g. Jane Mwale"
+          />
           <Field
             label="Year you left Mount View"
             name="year_left"
@@ -255,12 +278,23 @@ export default function AlumniForm() {
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F58220] text-sm font-black text-white">
             2
           </span>
-          <span className="text-lg font-black text-[#252B68]">What you&apos;re doing now</span>
+          <span className="text-lg font-black text-[#252B68]">
+            What you&apos;re doing now
+          </span>
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Current role / occupation" name="current_role" required placeholder="e.g. Software Engineer" />
-          <Field label="Organisation (optional)" name="organization" placeholder="e.g. Google, or 'Self-employed'" />
+          <Field
+            label="Current role / occupation"
+            name="current_role"
+            required
+            placeholder="e.g. Software Engineer"
+          />
+          <Field
+            label="Organisation (optional)"
+            name="organization"
+            placeholder="e.g. Google, or 'Self-employed'"
+          />
         </div>
 
         <div>
@@ -282,12 +316,26 @@ export default function AlumniForm() {
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#252B68] text-sm font-black text-white">
             3
           </span>
-          <span className="text-lg font-black text-[#252B68]">Contact &amp; links</span>
+          <span className="text-lg font-black text-[#252B68]">
+            Contact &amp; links
+          </span>
         </legend>
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Email (optional)" name="email" type="email" placeholder="you@example.com" />
-          <Field label="Phone (optional)" name="phone" type="tel" placeholder="+265 ..." />
+          {/* Required email — native validation + JS check both block submission */}
+          <Field
+            label="Email"
+            name="email"
+            type="email"
+            required
+            placeholder="you@example.com"
+          />
+          <Field
+            label="Phone (optional)"
+            name="phone"
+            type="tel"
+            placeholder="+265 ..."
+          />
         </div>
 
         <Field

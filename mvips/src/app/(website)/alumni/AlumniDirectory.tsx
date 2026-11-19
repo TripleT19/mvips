@@ -1,6 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 /* =========================================================
    Config
@@ -156,6 +162,77 @@ export default function AlumniDirectory({ alumni }: { alumni: Alumnus[] }) {
   const [search, setSearch] = useState("");
   const [decade, setDecade] = useState<"all" | number>("all");
 
+  /* ---------- Center-out entrance animation ---------- */
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [cols, setCols] = useState(1);
+  const [mounted, setMounted] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  // Respect prefers-reduced-motion.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReduceMotion(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  /**
+   * On every mount / alumni change:
+   *   1. Reset `mounted` → cards snap to start positions (invisible).
+   *   2. Measure the real column count synchronously (before paint).
+   *   3. On the NEXT frame, flip `mounted` → cards animate in.
+   *
+   * Using useLayoutEffect guarantees cols is correct before the animation
+   * starts, which is what makes the "pull toward centre then spread
+   * outward" effect actually visible (previously cols was still 1).
+   */
+  useLayoutEffect(() => {
+    const el = gridRef.current;
+
+    const measure = () => {
+      if (!el) return 1;
+      const children = Array.from(el.children) as HTMLElement[];
+      if (children.length === 0) return 1;
+      const firstTop = children[0].offsetTop;
+      let count = 0;
+      for (const child of children) {
+        if (child.offsetTop === firstTop) count++;
+        else break;
+      }
+      return count || 1;
+    };
+
+    if (!el) {
+      // No grid rendered (empty filtered state) — keep state consistent
+      // so the next non-empty render animates correctly.
+      setMounted(true);
+      return;
+    }
+
+    setMounted(false);
+    setCols(measure());
+
+    const raf = requestAnimationFrame(() => setMounted(true));
+
+    // Keep `cols` up-to-date on responsive re-layouts (no re-animation —
+    // cards stay at translateX(0) while the browser reflows the grid).
+    const ro = new ResizeObserver(() => {
+      setCols((prev) => {
+        const next = measure();
+        return next === prev ? prev : next;
+      });
+    });
+    ro.observe(el);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alumni]);
+
   const decades = useMemo(() => {
     const set = new Set<number>();
     for (const a of alumni) {
@@ -189,6 +266,55 @@ export default function AlumniDirectory({ alumni }: { alumni: Alumnus[] }) {
       })
       .sort((a, b) => b.year_left - a.year_left);
   }, [alumni, search, decade]);
+
+  /**
+   * Per-card entrance style.
+   *
+   *  - dx / dy  = card's offset from the grid's visual centre
+   *  - distance = Euclidean distance from centre → drives the stagger
+   *  - startX   = -dx * pullPx → cards start pulled TOWARD the centre,
+   *               then animate outward into their natural grid slot
+   *
+   * The result: the middle cards fire first and pop in place; outer cards
+   * trail, sliding outward — i.e. "start from the centre, going out".
+   */
+  function cardEntranceStyle(index: number): React.CSSProperties {
+    if (reduceMotion || !mounted) {
+      // Final state (or no animation): sit exactly in the grid slot.
+      if (reduceMotion) {
+        return { opacity: 1, transform: "none" };
+      }
+    }
+
+    const totalRows = Math.max(1, Math.ceil(filtered.length / cols));
+    const row = Math.floor(index / cols);
+    const col = index % cols;
+    const centerCol = (cols - 1) / 2;
+    const centerRow = (totalRows - 1) / 2;
+
+    const dx = col - centerCol;
+    const dy = row - centerRow;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    const staggerMs = 70;
+    const durationMs = 650;
+    const pullPx = 36;
+
+    const delay = distance * staggerMs;
+    const startX = -dx * pullPx;
+
+    return {
+      opacity: mounted ? 1 : 0,
+      transform: mounted
+        ? "translateX(0) scale(1)"
+        : `translateX(${startX}px) scale(0.92)`,
+      transition: [
+        `opacity ${durationMs * 0.5}ms ease ${delay}ms`,
+        `transform ${durationMs}ms cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms`,
+      ].join(", "),
+      willChange: "opacity, transform",
+    };
+  }
 
   /* ---------- Empty state ---------- */
   if (alumni.length === 0) {
@@ -262,10 +388,21 @@ export default function AlumniDirectory({ alumni }: { alumni: Alumnus[] }) {
           different decade.
         </div>
       ) : (
-        /* 2 → 3 → 4 → 5 → 6 columns as space grows */
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {filtered.map((person) => (
-            <AlumniCard key={person.id} person={person} />
+        /* 2 → 3 → 4 → 5 → 6 columns.
+           Each card's entrance is computed from its position relative to
+           the live grid centre — see cardEntranceStyle(). */
+        <div
+          ref={gridRef}
+          className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+        >
+          {filtered.map((person, index) => (
+            <div
+              key={person.id}
+              style={cardEntranceStyle(index)}
+              className="h-full"
+            >
+              <AlumniCard person={person} />
+            </div>
           ))}
         </div>
       )}
@@ -327,17 +464,14 @@ function AlumniCard({ person }: { person: Alumnus }) {
             className="h-full w-full transition-transform duration-700 ease-out group-hover:scale-[1.06]"
           />
 
-          {/* Bottom gradient — keeps name legible on any photo */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/55 to-transparent" />
 
-          {/* Class badge */}
           <span
             className={`absolute left-2.5 top-2.5 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] shadow-md ${accent.chip}`}
           >
             {person.year_left}
           </span>
 
-          {/* Name + role overlay — NO truncate, wraps freely */}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <h3 className="break-words text-sm font-black leading-tight text-white drop-shadow-sm line-clamp-2 sm:text-[15px]">
               {person.full_name}
@@ -352,7 +486,6 @@ function AlumniCard({ person }: { person: Alumnus }) {
 
       {/* ---------- Body ---------- */}
       <div className="flex flex-1 flex-col p-3">
-        {/* Location */}
         <p className="flex items-start gap-1 text-[11px] font-semibold leading-snug text-slate-500">
           <span aria-hidden className="mt-px shrink-0">
             📍
@@ -360,14 +493,12 @@ function AlumniCard({ person }: { person: Alumnus }) {
           <span className="break-words line-clamp-2">{person.location}</span>
         </p>
 
-        {/* Bio */}
         {person.bio && (
           <p className="mt-2 break-words text-[11px] leading-relaxed text-slate-600 line-clamp-3">
             {person.bio}
           </p>
         )}
 
-        {/* Message to students */}
         {person.message_to_students && (
           <figure className="relative mt-2 overflow-hidden rounded-lg bg-slate-50 px-2.5 py-2">
             <span
@@ -382,7 +513,6 @@ function AlumniCard({ person }: { person: Alumnus }) {
           </figure>
         )}
 
-        {/* Contact chips */}
         {hasContact && (
           <div className="mt-auto pt-3">
             <div className="flex flex-wrap gap-1.5">

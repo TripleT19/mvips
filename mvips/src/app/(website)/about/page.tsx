@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ImageWithFallback from "../../components/ImageWithFallback";
 
@@ -5,6 +6,48 @@ import ImageWithFallback from "../../components/ImageWithFallback";
  * Revalidate every hour.
  */
 export const revalidate = 3600;
+
+/* =========================================================
+   SEO — page-level metadata
+========================================================= */
+
+export const metadata: Metadata = {
+  title: "About Us — History, Founder & Cambridge Team in Blantyre",
+  description:
+    "Learn about Mount View International Primary School — founded in 1975 by Mrs. Sakker Sacranie. Meet our leadership, board, Headteacher Ms. Dimpal Rawat Juneja, and our experienced Cambridge academic team in Blantyre, Malawi.",
+  keywords: [
+    "about Mount View International Primary School",
+    "Mount View Primary School history",
+    "Mount View founder Sakker Sacranie",
+    "headteacher Dimpal Rawat Juneja",
+    "Cambridge school Blantyre",
+    "international primary school Blantyre",
+    "best international schools in Blantyre",
+    "Cambridge curriculum Malawi",
+    "Mount View leadership team",
+    "school board Blantyre Malawi",
+    "primary school teachers Blantyre",
+    "early years team Blantyre",
+  ],
+  alternates: {
+    canonical: "/about",
+  },
+  openGraph: {
+    type: "website",
+    url: "/about",
+    siteName: "Mount View International Primary School",
+    title:
+      "About Mount View International Primary School — Blantyre, Malawi",
+    description:
+      "Founded in 1975 in Blantyre, Malawi. Meet our founder, board, Headteacher Ms. Dimpal Rawat Juneja, and our experienced Cambridge academic team.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "About Mount View International Primary School",
+    description:
+      "Founded in 1975 in Blantyre, Malawi. Meet our leadership and Cambridge academic team.",
+  },
+};
 
 /* =========================================================
    IN-PAGE NAVIGATION (matches Header Dropdown)
@@ -76,7 +119,7 @@ const founder = {
   photo: "/images/team/founder.jpeg",
   initials: "SS",
   quote:
-    "Learning is more than just an academic pursuit—it is a lifelong adventure filled with discovery, creativity, and joy.",
+    "Learning is more than just an academic pursuit, it is a lifelong adventure filled with discovery, creativity, and joy.",
   bio: [
     "Mount View Primary School was founded by the remarkable Mrs. Sakker Sacranie, whose vision was to create an international school that offered quality education at affordable prices.",
     "Mrs. Sacranie was determined to bring this vision to life and successfully persuaded the then Head of State, Dr. Kamuzu Banda, and other influential community members of its necessity.",
@@ -121,18 +164,20 @@ const boardMembers = [
 ];
 
 const headteacher = {
-  name: "Ms. Dimpal Rawat",
+  name: "Ms. Dimpal Rawat Juneja",
   role: "Headteacher",
   photo: "/images/team/dimpal.jpg",
   initials: "D",
   tenure: "Leading Mount View",
   message: [
-    "It is with great pleasure that I extend a heartfelt welcome to you from Mount View International Primary School and Early Years Centre. We are honored to have your children as part of our school community, where their happiness, growth, and success are at the heart of everything we do.",
-    "At Mount View, we see learning as more than just an academic pursuit—it is a lifelong adventure filled with discovery, creativity, and joy. We are dedicated to nurturing not only the minds but also the hearts of our students, instilling in them the confidence, curiosity, and passion to pursue their dreams, wherever they may lead.",
-    "Each child who joins us is wonderfully unique, and we believe that their education should reflect that individuality. Our teaching approach is personalised to ensure that every student's learning journey is as special as they are.",
-    "Our school is a vibrant mosaic of cultures, languages, and traditions. Here at Mount View, we believe that understanding and appreciating our differences is what makes us stronger and more united.",
+    "It is with great pleasure that I extend a heartfelt welcome to you from Mount View International Primary School and Early Years Centre. We are honoured to have your children as part of our school community, where their happiness, growth, and success are at the heart of everything we do.",
+    "At Mount View, we believe that education is far more than the pursuit of academic achievement. It is a transformative journey that nurtures curiosity, creativity, confidence, and character. Every child who walks through our doors is unique, bringing their own talents, dreams, and perspectives. Our commitment is to provide a learning environment where each student feels valued, supported, and inspired to reach their full potential.",
+    "As Principal, I am passionate about fostering a culture where academic rigour is balanced with rich opportunities in sports, cultural activities, leadership, and personal development. True excellence is not measured solely by grades, but by the empathy, resilience, integrity, and sense of purpose that our students carry with them, throughout their lives. We strive to develop not only capable learners but also compassionate and responsible global citizens who are prepared to contribute meaningfully to an ever-changing world.",
+    "Our diverse and vibrant community is one of our greatest strengths. We celebrate the many cultures, languages, and traditions represented within our school, encouraging students to appreciate different perspectives and embrace inclusivity. Through innovative teaching, meaningful relationships, and the thoughtful integration of technology, we equip our learners with the critical thinking, collaboration, communication, and creativity skills essential for the future.",
+    "I firmly believe the students' success is built on strong partnerships between the school and home community. Guided by transparency, ethical leadership, and a growth mindset, I look forward to working closely with our parents, staff, and students to create an environment where every child feels seen, heard, and empowered to thrive.",
+    "Together, let us embark on a learning journey, filled with discovery, achievement, and joy.",
   ],
-  signature: "Ms. Dimpal Rawat · Headteacher",
+  signature: "Ms. Dimpal Rawat Juneja · Headteacher",
 };
 
 const administrator = {
@@ -149,7 +194,7 @@ const administrator = {
 };
 
 /* ---------------------------------------------------------
-   ACADEMIC TEAM DATA (unchanged)
+   ACADEMIC TEAM DATA
 --------------------------------------------------------- */
 
 const curriculumLeads = [
@@ -159,7 +204,7 @@ const curriculumLeads = [
     focus: "Literacy & Language",
     photo: "/images/team/samantha.JPG",
     initials: "S",
-    bio: "Leads English across the school while also teaching Year 6. Champions reading fluency, confident writing and a genuine love of stories.",
+    bio: "She provides curriculum leadership and guidance across the Primary School, ensuring the effective delivery of the Cambridge Primary English framework. She works collaboratively with teachers to strengthen teaching and learning, monitor curriculum progression, support lesson planning and promote consistent standards across all year groups. Her goal is to nurture a strong culture of literacy and develop confident, capable and enthusiastic communicators who are well prepared for their Cambridge assessments and beyond.",
   },
   {
     name: "Ms. Shalon Matiza",
@@ -167,7 +212,7 @@ const curriculumLeads = [
     focus: "Primary Mathematics",
     photo: "/images/team/shalon.jpeg",
     initials: "S",
-    bio: "Shapes mathematics teaching across the years, runs the problem-solving club and mentors new teachers joining the school.",
+    bio: "She is a passionate and dedicated educator with ten years of teaching experience and a strong commitment to Mathematics education. As a Mathematics Curriculum Leader, she champions effective teaching, curriculum development, assessment and teacher growth. She strives to create engaging learning experiences that foster curiosity, confidence, critical thinking and problem-solving skills, empowering learners to become independent thinkers who apply mathematical knowledge creatively and confidently in everyday life.",
   },
   {
     name: "Mr Tinashe Dankayi",
@@ -175,7 +220,7 @@ const curriculumLeads = [
     focus: "Science & Inquiry",
     photo: "/images/team/tinashe.JPG",
     initials: "T",
-    bio: "Leads hands-on science and inquiry-based learning, connecting classroom discovery to the real world around us.",
+    bio: "He is an experienced Science Curriculum Lead with over 15 years of experience in Zimbabwe and South Africa, specialising in curriculum development and alignment from Year 1 to Year 6. Passionate about fostering an inquiry-based, child-centred approach to science through hands-on, practical learning experiences. Committed to making scientific concepts accessible, engaging and meaningful, encouraging curiosity, critical thinking and problem-solving while ensuring measurable learning outcomes and a strong foundation in scientific understanding.",
   },
 ];
 
@@ -185,7 +230,7 @@ const earlyYearsCoordinator = {
   focus: "Nursery & Reception",
   photo: "/images/team/monica.JPG",
   initials: "M",
-  bio: "Orchestrates a warm, play-rich start to school life for our youngest learners. Leads the early years team across Nursery and Reception — shaping curriculum, mentoring teachers and ensuring every child's first steps into school feel safe, joyful and full of wonder.",
+  bio: "She is a passionate and dedicated professional with experience in healthcare, education, and management. She is a qualified General Nurse, holds a Bachelor's Degree in Education, and is a trained Jolly Phonics Trainer. Having worked in different countries and held various management positions, she has developed strong leadership skills and the ability to adapt to diverse working environments. She is currently pursuing a Master's Degree in Special Needs Education, driven by her passion for inclusive education and continuous professional growth. Outside her professional life, she enjoys travelling, baking, and hiking. She values new experiences, lifelong learning, and making a positive difference in the lives of others."
 };
 
 const earlyYearsTeachers = [
@@ -195,7 +240,7 @@ const earlyYearsTeachers = [
     className: "Pre-Nursery & Nursery",
     role: "Lead Teacher",
     photo: "/images/team/maria.JPG",
-    bio: "Creates the gentle, song-filled mornings our littlest learners look forward to. Builds early language, number sense and social confidence through stories, rhymes and purposeful play — and is often the very first friendly face a Mount View child meets.",
+    bio: "Ms. Mariah Chembe is a dedicated Early Years leader with nine years of experience at Mount View School, where she leads the Pre-Nursery and Nursery team with passion and purpose. Committed to excellence in teaching, learning, and care, she fosters a collaborative and nurturing environment for both staff and children. Passionate about early childhood development, she inspires young learners through play, storytelling, music, and meaningful experiences, helping each child build confidence, discover their unique strengths, and develop a strong foundation for lifelong learning and success.",
   },
   {
     name: "Ms. Chikondi Mvula",
@@ -203,28 +248,28 @@ const earlyYearsTeachers = [
     className: "Reception",
     role: "Lead Teacher",
     photo: "/images/team/mvula.JPG",
-    bio: "Guides Reception children as they grow in independence, curiosity and early reading. Blends structured phonics with imaginative play so that every learner leaves Reception ready — and excited — for Year 1.",
+    bio: "With over 13 years of experience in Early Years and Primary education, Ms. Chikondi Mvula is a dedicated educator and leader committed to nurturing confident, curious, and independent learners. As Reception Lead Teacher, she creates inclusive and inspiring learning environments where every child feels valued and empowered to succeed. Through purposeful play, inquiry-based learning, and strong foundations in literacy and numeracy, she fosters a lifelong love of learning. She is also passionate about educational leadership, mentoring educators, and driving excellence in Early Years practice and curriculum development.",
   },
 ];
 
 const primaryTeachers = [
   {
     name: "Ms Karen Songolo",
-    initials: "S",
+    initials: "KS",
     className: "Year 1",
     role: "Lead Teacher",
     subject: "English",
     photo: "/images/team/songolo.jpeg",
-    bio: "Ms Songolo brings 23 years of teaching experience at Mount View International School. She is passionate about working with young learners and creating a nurturing, engaging, and supportive learning environment. She believes in building strong foundations in literacy, numeracy, and essential life skills.",
+    bio: "Ms Songolo brings 23 years of teaching experience at Mount View International School. She is passionate about working with young learners and creating a nurturing, engaging, and supportive learning environment. She believes in building strong foundations in literacy, numeracy, and essential life skills. She values teamwork and collaboration with colleagues and parents to support every child’s development, inspire confidence, and create meaningful learning experiences that help each child reach their full potential.",
   },
   {
     name: "Ms. Muneerah Bhana",
-    initials: "B",
+    initials: "MB",
     className: "Year 2",
     role: "Lead Teacher",
-    subject: "Science",
+    subject: "English",
     photo: "/images/team/bhana.JPG",
-    bio: "Sparks curiosity in Year 2 with a specialist focus on Science. Encourages young learners to observe, question and experiment — turning everyday wonder into the first building blocks of scientific thinking.",
+    bio: "With 18 years teaching experience, including experience as a Head of Department (HOD) , Ms Bhana is a dedicated and passionate educator committed to providing quality education and supporting every child's learning journey. Having spent 10 years at Mount View International Primary School she serves as a Year 2  Lead Teacher ,  where she provides guidance , support and leadership to her teaching team.",
   },
   {
     name: "Mr. Clytone Bishi",
@@ -233,7 +278,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "Mathematics",
     photo: "/images/team/clyton.jpeg",
-    bio: "Builds mathematical confidence and problem-solving fluency in Year 3. Makes number work joyful and logical — through puzzles, patterns and hands-on challenges that stretch every learner.",
+    bio: "Mr. Clytone is a highly accomplished educator and leader with over 21 years of international teaching experience across Zimbabwe, Mozambique, Rwanda, and Malawi. Holding a Bachelor of Education Honours Degree in Educational Sociology, he brings deep expertise in Cambridge curriculum implementation, instructional leadership, and teacher development. Passionate about inclusive, learner-centred education, he champions inquiry-based learning, critical thinking, and academic excellence. Committed to nurturing confident, responsible, and socially conscious learners, he values strong partnerships, collaboration, and continuous professional growth as foundations of a thriving school community.",
   },
   {
     name: "Ms. Wakisa Mwanyongo",
@@ -242,7 +287,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "English",
     photo: "/images/team/wakisa.JPG",
-    bio: "Ms. Wakisa is a dedicated education professional with nine years of teaching experience and a passion for helping every learner succeed. She believes every child is unique and thrives through differentiated, hands-on learning.",
+    bio: "Ms. Wakisa is a dedicated education professional with nine years of teaching experience and a passion for helping every learner succeed. As a Lead Teacher at Mount View International School, she supports curriculum delivery, mentor colleagues, and promotes effective teaching practices. She believes every child is unique and thrives through differentiated, hands-on learning. Ms. Wakisa values strong partnerships with parents and teamwork with colleagues to create an inclusive, engaging, and supportive environment where all learners can grow in confidence, develop their strengths, and achieve success.",
   },
   {
     name: "Ms. Vanessa Adam",
@@ -251,7 +296,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "Mathematics",
     photo: "/images/team/vanesa.JPG",
-    bio: "With 20 years of experience at Mount View, Miss Adam is a dedicated educator passionate about nurturing young minds and inspiring a love for learning. As the Year 5 Lead Teacher, she is committed to supporting academic excellence.",
+    bio: "With 20 years of experience at Mount View, Miss Adam is a dedicated educator passionate about nurturing young minds and inspiring a love for learning. As the Year 5 Lead Teacher, she is committed to supporting academic excellence, building pupils’ confidence and creating a positive learning environment. She values teamwork, continuous growth and helping every child to be the best version of themselves, both academically and personally.",
   },
   {
     name: "Ms. Samantha Crozier",
@@ -260,7 +305,7 @@ const primaryTeachers = [
     role: "Lead Teacher",
     subject: "English",
     photo: "/images/team/samantha.JPG",
-    bio: "Prepares Year 6 learners for the transition to secondary school with a specialist focus on English. Builds exam readiness, essay craft and confident self-expression — alongside her wider role as Curriculum Lead for English across the school.",
+    bio: "Ms.Samantha is an accomplished educator and leader with 20 years of teaching experience, including six impactful years at Mount View Primary School. As Lead Teacher and English Subject Lead, she is dedicated to developing confident communicators and inspiring lifelong learners. Her commitment to excellence was reflected in her Year 6 Cambridge Checkpoint results, where every learner exceeded the Basic performance level. Passionate about unlocking each child’s potential, she combines high expectations with encouragement and support, empowering students to achieve success and embrace a love of learning.",
   },
 ];
 
@@ -284,7 +329,7 @@ const teams: Team[] = [
     tagline: "Where joyful learning begins.",
     description:
       "A warm, play-rich team guiding our youngest learners from their very first steps through to confident, curious Reception children ready for Year 1.",
-    photo: "/images/teams/early-years-team.jpg",
+    photo: "/images/team/early-years-team.jpg",
     accent: "yellow",
   },
   {
@@ -292,8 +337,8 @@ const teams: Team[] = [
     name: "Key Stage 1 Team",
     tagline: "Strong foundations, confident starters.",
     description:
-      "Dedicated teachers building early literacy, numeracy and independence — helping children settle into primary school life with courage and curiosity.",
-    photo: "/images/teams/year-1-team.jpg",
+      "Dedicated teachers building early literacy, numeracy and independence, helping children settle into primary school life with courage and curiosity.",
+    photo: "/images/team/year-1-team.jpg",
     accent: "navy",
   },
   {
@@ -301,53 +346,26 @@ const teams: Team[] = [
     name: "Lower Key Stage 2 Team",
     tagline: "Curiosity, courage and character.",
     description:
-      "A close-knit team growing young readers, writers and thinkers — celebrating every small victory as pupils gain confidence and take on bigger challenges.",
-    photo: "/images/teams/year-2-team.jpg",
+      "A close-knit team growing young readers, writers and thinkers, celebrating every small victory as pupils gain confidence and take on bigger challenges.",
+    photo: "/images/team/year-2-team.jpg",
     accent: "orange",
   },
-  { 
+  {
     key: "Upper Key Stage 2",
     name: "Upper Key Stage 2 Team",
     tagline: "Growing independence, deepening skills.",
     description:
-      "Guiding pupils through the transition into Key Stage 2 — widening their horizons while building study habits that last a lifetime.",
-    photo: "/images/teams/year-3-team.jpg",
+      "Guiding pupils through the transition into Key Stage 2, widening their horizons while building study habits that last a lifetime.",
+    photo: "/images/team/year-3-team.jpg",
     accent: "navy",
   },
-  // {
-  //   key: "year-4",
-  //   name: "Year 4 Team",
-  //   tagline: "Wider horizons, bigger challenges.",
-  //   description:
-  //     "Encouraging learners to explore, question and take ownership of their learning through rich topics, collaborative projects and creative problem-solving.",
-  //   photo: "/images/teams/year-4-team.jpg",
-  //   accent: "orange",
-  // },
-  // {
-  //   key: "year-5",
-  //   name: "Year 5 Team",
-  //   tagline: "Excellence, empathy and exploration.",
-  //   description:
-  //     "Preparing pupils for their final primary years — building depth in core subjects alongside confidence, resilience and a strong sense of community.",
-  //   photo: "/images/teams/year-5-team.jpg",
-  //   accent: "navy",
-  // },
-  // {
-  //   key: "year-6",
-  //   name: "Year 6 Team",
-  //   tagline: "Ready for the next chapter.",
-  //   description:
-  //     "Our final-year team prepares pupils for Cambridge Checkpoint exams and a confident move to secondary school — academically and personally.",
-  //   photo: "/images/teams/year-6-team.jpg",
-  //   accent: "orange",
-  // },
   {
     key: "specialist",
     name: "Specialist Team",
     tagline: "Creative, active, hands-on learning.",
     description:
       "Cambridge specialist teachers of Art, Dance & Drama, Music, PE, ICT and Swimming — bringing creativity, movement and discovery to every learner across the school.",
-    photo: "/images/teams/specialist-team.jpg",
+    photo: "/images/team/specialist-team.jpg",
     accent: "yellow",
   },
   {
@@ -355,8 +373,8 @@ const teams: Team[] = [
     name: "Admin Team",
     tagline: "The friendly face behind every day.",
     description:
-      "The team that keeps Mount View running smoothly — welcoming families, coordinating admissions, and supporting staff across every corner of the school.",
-    photo: "/images/teams/admin-team.jpg",
+      "The team that keeps Mount View running smoothly, welcoming families, coordinating admissions, and supporting staff across every corner of the school.",
+    photo: "/images/team/Admin.png",
     accent: "navy",
   },
 ];
@@ -368,6 +386,83 @@ const teams: Team[] = [
 export default function AboutPage() {
   return (
     <main className="overflow-hidden bg-white text-[#172033]">
+      {/* =========================================================
+          SEO — Structured Data (AboutPage + School + Breadcrumb)
+      ========================================================== */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@graph": [
+              {
+                "@type": "AboutPage",
+                "@id": "https://mountviewmw.com/about#page",
+                url: "https://mountviewmw.com/about",
+                name: "About Mount View International Primary School",
+                description:
+                  "History, founder, mission, governance and academic team of Mount View International Primary School in Blantyre, Malawi.",
+                isPartOf: { "@id": "https://mountviewmw.com/#website" },
+                about: { "@id": "https://mountviewmw.com/#school" },
+                breadcrumb: {
+                  "@type": "BreadcrumbList",
+                  itemListElement: [
+                    {
+                      "@type": "ListItem",
+                      position: 1,
+                      name: "Home",
+                      item: "https://mountviewmw.com",
+                    },
+                    {
+                      "@type": "ListItem",
+                      position: 2,
+                      name: "About",
+                      item: "https://mountviewmw.com/about",
+                    },
+                  ],
+                },
+              },
+              {
+                "@type": ["School", "EducationalOrganization"],
+                "@id": "https://mountviewmw.com/#school",
+                name: "Mount View International Primary School & Early Years Centre",
+                url: "https://mountviewmw.com",
+                logo: "https://mountviewmw.com/logo12.png",
+                foundingDate: "1975",
+                founder: {
+                  "@type": "Person",
+                  name: "Mrs. Sakker Sacranie",
+                  jobTitle: "Founder",
+                },
+                employee: [
+                  {
+                    "@type": "Person",
+                    name: "Ms. Dimpal Rawat Juneja",
+                    jobTitle: "Headteacher",
+                  },
+                  {
+                    "@type": "Person",
+                    name: "Mr. Rohit Singh Raghav",
+                    jobTitle: "School Administrator",
+                  },
+                  {
+                    "@type": "Person",
+                    name: "Mr Irfan K. Bheda",
+                    jobTitle: "Chairman of the Board",
+                  },
+                ],
+                address: {
+                  "@type": "PostalAddress",
+                  addressLocality: "Blantyre",
+                  addressRegion: "Southern Region",
+                  addressCountry: "MW",
+                },
+              },
+            ],
+          }),
+        }}
+      />
+
       {/* ---------- shared animation styles ---------- */}
       <style>{`
         @keyframes mv-float { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-16px) rotate(8deg)} }
@@ -477,7 +572,7 @@ export default function AboutPage() {
                 <div className="relative">
                   <ImageWithFallback
                     src="/images/school-1.JPG"
-                    alt="Learners at Mount View International Primary School"
+                    alt="Learners at Mount View International Primary School in Blantyre, Malawi"
                     className="aspect-[4/5] w-full sm:aspect-[4/3]"
                   />
                   <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#0B0F2E] via-[#0B0F2E]/45 to-transparent" />
@@ -577,7 +672,7 @@ export default function AboutPage() {
                 </p>
                 <p>
                   At Mount View, we see learning as more than just an academic
-                  pursuit—it is a lifelong adventure filled with discovery,
+                  pursuit, it is a lifelong adventure filled with discovery,
                   creativity, and joy. We are dedicated to nurturing not only
                   the minds but also the hearts of our students.
                 </p>
@@ -726,7 +821,7 @@ export default function AboutPage() {
                 <div className="group relative h-72 w-72 shrink-0 overflow-hidden rounded-full bg-[#252B68] shadow-[0_0_40px_rgba(255,233,0,0.3)] ring-[8px] ring-[#FFE900]/50 transition-all duration-500 hover:scale-105 hover:ring-[#FFE900]/80 sm:h-80 sm:w-80">
                   <ImageWithFallback
                     src={founder.photo}
-                    alt={founder.name}
+                    alt={`${founder.name} — founder of Mount View International Primary School`}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                   />
                 </div>
@@ -945,7 +1040,7 @@ export default function AboutPage() {
       </section>
 
       {/* =====================================================
-          ACADEMIC TEAM (unchanged)
+          ACADEMIC TEAM
       ====================================================== */}
       <section
         id="lead-teachers"
@@ -1341,7 +1436,7 @@ function TeamCard({ team }: { team: Team }) {
       <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
         <ImageWithFallback
           src={team.photo}
-          alt={`${team.name} group photo`}
+          alt={`${team.name} group photo — Mount View International Primary School in Blantyre`}
           className="h-full w-full object-cover transition duration-700 group-hover:scale-105"
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
