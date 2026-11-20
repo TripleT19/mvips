@@ -1,31 +1,30 @@
-import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
-  reactCompiler: true,
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: "standalone",
 
   images: {
     remotePatterns: [
-      // GitHub Codespaces forwarded backend
       {
         protocol: "https",
-        hostname: "*.app.github.dev",
-        pathname: "/storage/**",
-      },
-      // Local development backend
-      {
-        protocol: "http",
-        hostname: "localhost",
-        port: "8000",
+        hostname: "*.nzerutechsolutions.com",
         pathname: "/storage/**",
       },
       {
-        protocol: "http",
-        hostname: "127.0.0.1",
-        port: "8000",
+        protocol: "https",
+        hostname: "mvips-api.nzerutechsolutions.com",
         pathname: "/storage/**",
       },
     ],
   },
+
+  experimental: {
+    webpackMemoryOptimizations: true,
+  },
+
+  productionBrowserSourceMaps: false,
+  poweredByHeader: false,
+  compress: true,
 };
 
 export default nextConfig;

@@ -532,10 +532,23 @@ export default function Footer() {
       ─────────────────────────────── */}
       <div className="border-t border-white/10 bg-[#171B4A]">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-blue-200 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
-          <p>
-            © {new Date().getFullYear()} Mount View International Primary
-            School &amp; Early Years Centre. All rights reserved.
-          </p>
+          <div>
+            <p>
+              © {new Date().getFullYear()} Mount View International Primary
+              School &amp; Early Years Centre. All rights reserved.
+            </p>
+            <p className="mt-1 text-xs text-blue-300">
+              Website designed &amp; developed by{" "}
+              <a
+                href="https://nzerutechsolutions.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-[#FFE900] transition hover:text-white hover:underline"
+              >
+                Nzeru Tech Solutions
+              </a>
+            </p>
+          </div>
 
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/about" className="transition hover:text-white">

@@ -14,12 +14,13 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
-export default function ParentResetPasswordPage() {
+/* ---------- Inner component (uses useSearchParams) ---------- */
+function ParentResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -298,5 +299,26 @@ export default function ParentResetPasswordPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+/* ---------- Fallback (matches your existing spinner style) ---------- */
+function PageFallback() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[#F6F7FB]">
+      <div className="flex items-center gap-3 text-sm text-gray-500">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-[#252B68]" />
+        Loading…
+      </div>
+    </main>
+  );
+}
+
+/* ---------- Default export ---------- */
+export default function ParentResetPasswordPage() {
+  return (
+    <Suspense fallback={<PageFallback />}>
+      <ParentResetPasswordContent />
+    </Suspense>
   );
 }

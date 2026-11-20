@@ -366,12 +366,6 @@ const personalisedPoints = [
   { icon: "📈", text: "Goal-setting with teachers to foster agency and accountability", image: "/images/mothers-day3.jpg" },
 ];
 
-const fallbackLeadership = [
-  { icon: "🏛️", title: "Student council and ambassador roles", image: "/images/school-life.jpg" },
-  { icon: "🌐", title: "Service learning projects tied to the UN Sustainable Development Goals", image: "/images/early-years-global.jpg" },
-  { icon: "🎤", title: "Public speaking and debate clubs", image: "/images/creative-arts.jpg" },
-];
-
 const whyChooseUs = [
   { icon: "🏫", text: "Safe, inclusive, and inspiring school environment" },
   { icon: "🔬", text: "Research-based curriculum with connection to real-world learning" },
@@ -512,28 +506,16 @@ function ExpandedStageCard({ stage }: { stage: ChildStage }) {
 export default async function AcademicsPage() {
   const leadershipActivities = await getLeadershipActivities(6);
 
-  const leadershipCards =
-    leadershipActivities.length > 0
-      ? leadershipActivities.map((a) => ({
-          key: `activity-${a.id}`,
-          title: a.title,
-          category: a.category,
-          participants: a.participants,
-          story: a.story,
-          activityDate: a.activity_date,
-          imageUrl: a.image_url,
-          icon: "🏛️",
-        }))
-      : fallbackLeadership.map((f, i) => ({
-          key: `fallback-${i}`,
-          title: f.title,
-          category: null as string | null,
-          participants: null as string | null,
-          story: null as string | null,
-          activityDate: null as string | null,
-          imageUrl: f.image,
-          icon: f.icon,
-        }));
+  const leadershipCards = leadershipActivities.map((a) => ({
+    key: `activity-${a.id}`,
+    title: a.title,
+    category: a.category,
+    participants: a.participants,
+    story: a.story,
+    activityDate: a.activity_date,
+    imageUrl: a.image_url,
+    icon: "🏛️",
+  }));
 
   return (
     <main className="overflow-hidden bg-white text-[#172033]">
@@ -1453,59 +1435,82 @@ export default async function AcademicsPage() {
             subtitle="Real activities led by our students and teachers, capturing the moments where leadership, service and global citizenship come alive."
           />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {leadershipCards.map((card) => (
-              <article
-                key={card.key}
-                className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur transition duration-300 hover:-translate-y-2 hover:border-[#FFE900]/40 hover:bg-white/10"
-              >
-                {card.imageUrl && (
-                  <div className="relative aspect-[16/10] overflow-hidden">
-                    <ImageWithFallback
-                      src={card.imageUrl}
-                      alt={`${card.title} at Mount View International Primary School`}
-                      className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
-                    />
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#171B4A] via-[#171B4A]/40 to-transparent" />
+          {leadershipCards.length > 0 ? (
+            <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {leadershipCards.map((card) => (
+                <article
+                  key={card.key}
+                  className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/5 backdrop-blur transition duration-300 hover:-translate-y-2 hover:border-[#FFE900]/40 hover:bg-white/10"
+                >
+                  {card.imageUrl && (
+                    <div className="relative aspect-[16/10] overflow-hidden">
+                      <ImageWithFallback
+                        src={card.imageUrl}
+                        alt={`${card.title} at Mount View International Primary School`}
+                        className="h-full w-full object-cover transition duration-700 group-hover:scale-110"
+                      />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#171B4A] via-[#171B4A]/40 to-transparent" />
 
-                    {card.category && (
-                      <span className="absolute left-4 top-4 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#252B68] shadow-md">
-                        {card.category}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex flex-1 flex-col p-6">
-                  <h3 className="text-lg font-black leading-snug text-white">
-                    <span className="mr-2">{card.icon}</span>
-                    {card.title}
-                  </h3>
-
-                  {card.story && (
-                    <p className="mt-2 text-sm leading-7 text-blue-100">
-                      {limitWords(card.story, MAX_STORY_WORDS)}
-                    </p>
-                  )}
-
-                  {(card.participants || card.activityDate) && (
-                    <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 text-[11px] font-bold text-blue-100/90">
-                      {card.participants && (
-                        <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1">
-                          👥 {card.participants}
-                        </span>
-                      )}
-                      {card.activityDate && (
-                        <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1">
-                          📅 {formatLongDate(card.activityDate)}
+                      {card.category && (
+                        <span className="absolute left-4 top-4 inline-flex items-center rounded-full bg-[#FFE900] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[#252B68] shadow-md">
+                          {card.category}
                         </span>
                       )}
                     </div>
                   )}
-                </div>
-              </article>
-            ))}
-          </div>
+
+                  <div className="flex flex-1 flex-col p-6">
+                    <h3 className="text-lg font-black leading-snug text-white">
+                      <span className="mr-2">{card.icon}</span>
+                      {card.title}
+                    </h3>
+
+                    {card.story && (
+                      <p className="mt-2 text-sm leading-7 text-blue-100">
+                        {limitWords(card.story, MAX_STORY_WORDS)}
+                      </p>
+                    )}
+
+                    {(card.participants || card.activityDate) && (
+                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4 text-[11px] font-bold text-blue-100/90">
+                        {card.participants && (
+                          <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1">
+                            👥 {card.participants}
+                          </span>
+                        )}
+                        {card.activityDate && (
+                          <span className="inline-flex items-center rounded-full bg-white/10 px-2.5 py-1">
+                            📅 {formatLongDate(card.activityDate)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-12 rounded-3xl border border-white/10 bg-white/5 p-10 text-center backdrop-blur sm:p-14">
+              <div className="mv-pop mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#FFE900]/15 text-3xl">
+                🏛️
+              </div>
+              <h3 className="mt-5 text-xl font-black text-white sm:text-2xl">
+                Our leadership stories are on their way.
+              </h3>
+              <p className="mx-auto mt-3 max-w-lg text-sm leading-7 text-blue-100 sm:text-base">
+                Check back soon to see the moments where leadership, service
+                and global citizenship come alive at Mount View — led by our
+                students and teachers.
+              </p>
+              <Link
+                href="/news"
+                className="group mt-7 inline-flex items-center gap-2 rounded-full bg-[#FFE900] px-6 py-3 text-sm font-black text-[#252B68] shadow-lg transition hover:-translate-y-0.5 hover:bg-white hover:shadow-xl"
+              >
+                Visit News &amp; Stories
+                <span className="transition group-hover:translate-x-1">→</span>
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -1518,22 +1523,29 @@ export default async function AcademicsPage() {
           />
 
           <div className="mt-12 overflow-hidden rounded-[2rem] shadow-xl">
-            <div className="relative aspect-[16/6] w-full">
+          <div className="relative isolate aspect-[16/6] w-full">
+            {/* Image layer — forced to the back */}
+            <div className="absolute inset-0 z-0">
               <ImageWithFallback
-                src="/images/school-life.jpg"
+                src="/images/school-life2.jpg"
                 alt="Life at Mount View International Primary School in Blantyre, Malawi"
                 className="h-full w-full object-cover"
               />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#252B68] via-[#252B68]/40 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-6 sm:p-8">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#FFE900]">
-                  Every child, every day
-                </p>
-                <p className="mt-2 text-xl font-black text-white sm:text-2xl">
-                  A community where children learn, grow and thrive together.
-                </p>
-              </div>
             </div>
+
+            {/* Gradient scrim — above the image, below the text */}
+            <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-t from-[#252B68] via-[#252B68]/40 to-transparent" />
+
+            {/* Text overlay — always on top */}
+            <div className="absolute inset-x-0 bottom-0 z-20 p-6 sm:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-[#FFE900]">
+                Every child, every day
+              </p>
+              <p className="mt-2 text-xl font-black text-white sm:text-2xl">
+                A community where children learn, grow and thrive together.
+              </p>
+            </div>
+          </div>
           </div>
 
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
